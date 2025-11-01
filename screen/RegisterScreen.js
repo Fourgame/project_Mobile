@@ -66,37 +66,50 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!firstName || !lastName || !studentId || !email || !password) {
-      Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกทุกช่องให้ครบถ้วน");
-      return;
-    }
+  if (!firstName || !lastName || !studentId || !email || !password) {
+    Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกทุกช่องให้ครบถ้วน");
+    return;
+  }
 
-    try {
-      setLoading(true);
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
-      );
-      const uid = cred.user.uid;
+  try {
+    setLoading(true);
 
-      await setDoc(doc(db, "users", uid), {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        studentId: studentId.trim(),
-        email: email.trim().toLowerCase(),
-        createdAt: serverTimestamp(),
+    // 1) สมัคร user บน Firebase Auth
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      email.trim(),
+      password
+    );
+    const uid = cred.user.uid;
+
+    // 2) พยายามเขียนข้อมูลผู้ใช้ลง Firestore
+    //    แต่ไม่ block flow หลัก (ไม่ await)
+    setDoc(doc(db, "users", uid), {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      studentId: studentId.trim(),
+      email: email.trim().toLowerCase(),
+      createdAt: serverTimestamp(),
+    })
+      .then(() => {
+        console.log("Profile saved to Firestore");
+      })
+      .catch((err) => {
+        console.log("Firestore write failed:", err);
       });
 
-      Alert.alert("สำเร็จ", "สมัครสมาชิกเรียบร้อย");
-      navigation.replace("Login");
-    } catch (err) {
-      console.log("Register error:", err);
-      Alert.alert("สมัครไม่สำเร็จ", err?.message ?? "เกิดข้อผิดพลาด");
-    } finally {
-      setLoading(false);
-    }
-  };
+    // 3) ผู้ใช้ถือว่าสมัครสำเร็จแล้ว ณ จุดนี้
+    Alert.alert("สำเร็จ", "สมัครสมาชิกเรียบร้อย");
+    navigation.replace("Login");
+
+  } catch (err) {
+    console.log("Register error:", err);
+    Alert.alert("สมัครไม่สำเร็จ", err?.message ?? "เกิดข้อผิดพลาด");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#EEFCDC" }}>

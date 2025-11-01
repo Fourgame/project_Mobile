@@ -1,49 +1,35 @@
-// Import the functions you need from the SDKs you need
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
-  getAuth,
   initializeAuth,
   getReactNativePersistence,
 } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBx_YA8BJV662-9TblV3_FerIh9NLChkkg",
-  authDomain: "mobile-2025-9ebe4.firebaseapp.com",
-  projectId: "mobile-2025-9ebe4",
-  storageBucket: "mobile-2025-9ebe4.firebasestorage.app",
-  messagingSenderId: "255215107877",
-  appId: "1:255215107877:web:8e67da8fe029271408e4cc"
+  apiKey: "AIzaSyBsy4EDl7fwEHh5K5fn_XaQ0RfMaxTkdsY",
+  authDomain: "mobile2025-afc6c.firebaseapp.com",
+  projectId: "mobile2025-afc6c",
+  storageBucket: "mobile2025-afc6c.firebasestorage.app",
+  messagingSenderId: "614711073787",
+  appId: "1:614711073787:web:1e4fd068fbd788c13e895e",
+  measurementId: "G-PHL6SSQTF1",
 };
 
-
-
-
+// ป้องกัน init ซ้ำตอน reload
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
+// ใช้ initializeAuth แบบเดียว (ไม่มี getAuth ตรงไหนเลย)
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 
-let auth;
-try {
+// ใช้ Firestore แบบ long-polling เพื่อกันค้าง
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false,
+});
 
-  auth = getAuth(app);
-} catch (e) {
-
-}
-if (!auth || !auth.app) {
-  try {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
-  } catch (e) {
-    auth = getAuth(app);
-  }
-}
-
-const db = getFirestore(app);
+console.log("🔥 Firestore initialized with long-polling");
 
 export { app, auth, db };
