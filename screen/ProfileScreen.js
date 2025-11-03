@@ -210,7 +210,7 @@ export default function ProfileScreen({ navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar backgroundColor="#3A5A1B" barStyle="light-content" />
+        <StatusBar backgroundColor="#fff" barStyle="dark-content" />
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" />
         </View>
@@ -220,7 +220,7 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar backgroundColor="#3A5A1B" barStyle="light-content" />
+      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
       <KeyboardAvoidingKeyboardWrap>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.card}>
