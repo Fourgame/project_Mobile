@@ -15,7 +15,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth, db } from "../firebase/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  limit,
+} from "firebase/firestore";
 function InputBox({
   placeholder,
   secureTextEntry = false,
@@ -58,57 +67,68 @@ function Btn({ text, onPress, disabled }) {
 export default function RegisterScreen({ navigation }) {
   const LOGO_IMG = { uri: "https://i.ibb.co/yyzQ43h/KU-Logo-PNG.png" };
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [studentId, setStudentId] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-  if (!firstName || !lastName || !studentId || !email || !password) {
-    Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกทุกช่องให้ครบถ้วน");
-    return;
-  }
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+    const trimmedConfirm = confirmPassword.trim();
 
-  try {
-    setLoading(true);
+    if (!trimmedUsername || !trimmedEmail || !trimmedPassword || !trimmedConfirm) {
+      Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกทุกช่องให้ครบถ้วน");
+      return;
+    }
 
-    // 1) สมัคร user บน Firebase Auth
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      email.trim(),
-      password
-    );
-    const uid = cred.user.uid;
+    if (trimmedPassword !== trimmedConfirm) {
+      Alert.alert("รหัสผ่านไม่ตรงกัน", "กรุณายืนยันรหัสผ่านให้ตรงกับรหัสผ่านหลัก");
+      return;
+    }
 
-    // 2) พยายามเขียนข้อมูลผู้ใช้ลง Firestore
-    //    แต่ไม่ block flow หลัก (ไม่ await)
-    setDoc(doc(db, "users", uid), {
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      studentId: studentId.trim(),
-      email: email.trim().toLowerCase(),
-      createdAt: serverTimestamp(),
-    })
-      .then(() => {
-        console.log("Profile saved to Firestore");
-      })
-      .catch((err) => {
-        console.log("Firestore write failed:", err);
+    try {
+      setLoading(true);
+
+      const existing = await getDocs(
+        query(
+          collection(db, "users"),
+          where("username", "==", trimmedUsername),
+          limit(1)
+        )
+      );
+
+      if (!existing.empty) {
+        Alert.alert("ชื่อผู้ใช้ซ้ำ", "กรุณาเลือกชื่อผู้ใช้อื่น");
+        return;
+      }
+
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        trimmedEmail,
+        trimmedPassword
+      );
+      const uid = cred.user.uid;
+
+      const role = trimmedUsername.toLowerCase() === "admin" ? "admin" : "customer";
+
+      await setDoc(doc(db, "users", uid), {
+        username: trimmedUsername,
+        email: trimmedEmail,
+        role,
       });
 
-    // 3) ผู้ใช้ถือว่าสมัครสำเร็จแล้ว ณ จุดนี้
-    Alert.alert("สำเร็จ", "สมัครสมาชิกเรียบร้อย");
-    navigation.replace("Login");
-
-  } catch (err) {
-    console.log("Register error:", err);
-    Alert.alert("สมัครไม่สำเร็จ", err?.message ?? "เกิดข้อผิดพลาด");
-  } finally {
-    setLoading(false);
-  }
-};
+      Alert.alert("สำเร็จ", "สมัครสมาชิกเรียบร้อย");
+      navigation.replace("Login");
+    } catch (err) {
+      console.log("Register error:", err);
+      Alert.alert("สมัครไม่สำเร็จ", err?.message ?? "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   return (
@@ -135,22 +155,9 @@ export default function RegisterScreen({ navigation }) {
           </View>
 
           <InputBox
-            placeholder="First Name"
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-          />
-          <InputBox
-            placeholder="Last Name"
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-          />
-          <InputBox
-            placeholder="Student ID"
-            value={studentId}
-            onChangeText={setStudentId}
-            keyboardType="number-pad"
+            placeholder="Username"
+            value={username}
+            onChangeText={setUsername}
             autoCapitalize="none"
           />
           <InputBox
@@ -164,6 +171,13 @@ export default function RegisterScreen({ navigation }) {
             placeholder="Password"
             value={password}
             onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+          <InputBox
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
             secureTextEntry
             autoCapitalize="none"
           />

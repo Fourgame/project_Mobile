@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/LoginScreenStyles";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase/firebaseConfig";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { auth, db } from "../firebase/firebaseConfig";
 
 function InputBox({
   placeholder,
@@ -49,18 +50,42 @@ export default function LoginScreen({ navigation }) {
     uri: "https://i.ibb.co/yyzQ43h/KU-Logo-PNG.png",
   };
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
 
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Missing fields", "Please enter both email and password.");
+    const trimmedIdentifier = identifier.trim();
+    if (!trimmedIdentifier || !password) {
+      Alert.alert("Missing fields", "Please enter both username/email and password.");
       return;
     }
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      let emailForAuth;
+      if (!trimmedIdentifier.includes("@")) {
+        const userSnap = await getDocs(
+          query(
+            collection(db, "users"),
+            where("username", "==", trimmedIdentifier),
+            limit(1)
+          )
+        );
+        if (userSnap.empty) {
+          Alert.alert("Login Failed", "Wrong username or password");
+          return;
+        }
+        const userData = userSnap.docs[0]?.data();
+        if (!userData?.email) {
+          Alert.alert("Login Failed", "Account has no email associated.");
+          return;
+        }
+        emailForAuth = userData.email;
+      } else {
+        emailForAuth = trimmedIdentifier.toLowerCase();
+      }
+
+      await signInWithEmailAndPassword(auth, emailForAuth, password);
       navigation.replace("MainDrawer");
     } catch (error) {
       console.log("Login error:", error);
@@ -77,10 +102,9 @@ export default function LoginScreen({ navigation }) {
 
 
           <InputBox
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            placeholder="Email or Username"
+            value={identifier}
+            onChangeText={setIdentifier}
           />
           <InputBox
             placeholder="Password"
