@@ -39,6 +39,17 @@ export default function ProductDetail({ navigation, route }) {
     hasStock &&
     currentPurchaseQuantity > 0 &&
     (availableQuantity === 0 || currentPurchaseQuantity <= availableQuantity);
+  const formattedPrice =
+    price !== undefined && price !== null
+      ? `฿ ${Number(price).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`
+      : "-";
+  const description =
+    typeof detail === "string" && detail.trim().length > 0
+      ? detail.trim()
+      : "";
 
   const handleAddToCart = () => {
     if (!item) return;
@@ -126,15 +137,27 @@ export default function ProductDetail({ navigation, route }) {
           </View>
         )}
 
-        <View style={styles.textBlock}>
+        <View style={styles.infoSection}>
           <Text style={styles.name}>{name || "Unnamed item"}</Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.price}>
-              {price !== undefined && price !== null ? `฿ ${price}` : "-"}
+
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formattedPrice}</Text>
+            <Text
+              style={[
+                styles.stockInfo,
+                !hasStock && styles.stockInfoOut,
+              ]}
+            >
+              {hasStock ? `เหลือ ${quantityDisplay} ชิ้น` : "สินค้าหมด"}
             </Text>
-            <Text style={styles.quantityText}>เหลือ {quantityDisplay} ชิ้น</Text>
           </View>
-          {!!detail && <Text style={styles.detail}>{detail}</Text>}
+
+          {description ? (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.sectionLabel}>รายละเอียดสินค้า</Text>
+              <Text style={styles.detail}>{description}</Text>
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -280,36 +303,50 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignSelf: "center",
   },
-  textBlock: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: "#d6d6d6",
-    paddingTop: 16,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
+  infoSection: {
+    width: "100%",
+    gap: 16,
+    alignSelf: "stretch",
   },
   name: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
     color: "#222",
-    marginBottom: 8,
+  },
+  priceRow: {
+    alignItems: "flex-end",
+    alignSelf: "stretch",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "#E0E6F0",
+    paddingBottom: 12,
   },
   price: {
-    fontSize: 18,
+    fontSize: 28,
     fontWeight: "700",
     color: "#0C7FDA",
   },
-  quantityText: {
-    fontSize: 16,
+  stockInfo: {
+    fontSize: 14,
     fontWeight: "600",
-    color: "#222",
+    color: "#1BBF72",
+  },
+  stockInfoOut: {
+    color: "#DC4B4B",
+  },
+  descriptionSection: {
+    gap: 6,
+  },
+  sectionLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1F2A37",
   },
   detail: {
-    fontSize: 15,
-    color: "#444",
+    fontSize: 14,
+    lineHeight: 22,
+    color: "#4A5568",
   },
   footer: {
     flexDirection: "row",
