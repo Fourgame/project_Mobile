@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -14,12 +14,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useCart } from "../context/CartContext";
+import { useFocusEffect } from "@react-navigation/native";
+import { auth, db } from "../firebase/firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function ProductDetail({ navigation, route }) {
   const item = route.params?.item;
   const { addToCart } = useCart();
   const [buySheetVisible, setBuySheetVisible] = useState(false);
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
+  const [isProfileComplete, setIsProfileComplete] = useState(null);
 
   const imageUri = item?.picture || "";
   const price = item?.price;
@@ -50,6 +54,57 @@ export default function ProductDetail({ navigation, route }) {
     typeof detail === "string" && detail.trim().length > 0
       ? detail.trim()
       : "";
+  const navigateToProfile = () => {
+    const parentNav = navigation.getParent?.();
+    if (parentNav) {
+      parentNav.navigate("MainDrawer", { screen: "Profile" });
+    } else {
+      navigation.navigate("MainDrawer", { screen: "Profile" });
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const fetchProfile = async () => {
+        const user = auth.currentUser;
+        if (!user) {
+          if (isActive) setIsProfileComplete(false);
+          return;
+        }
+        try {
+          const snap = await getDoc(doc(db, "users", user.uid));
+          if (!isActive) {
+            return;
+          }
+          const data = snap.data();
+          const trimmedPhone = (data?.phone || "").replace(/\D/g, "");
+          const hasPhone = trimmedPhone.length === 10;
+          const address = data?.address;
+          const hasAddress =
+            !!address &&
+            typeof address.detail === "string" &&
+            address.detail.trim().length > 0 &&
+            address.provinceCode !== undefined &&
+            address.provinceCode !== null &&
+            address.districtCode !== undefined &&
+            address.districtCode !== null &&
+            address.subdistrictCode !== undefined &&
+            address.subdistrictCode !== null &&
+            address.postalCode !== undefined &&
+            address.postalCode !== null &&
+            String(address.postalCode).trim().length > 0;
+          setIsProfileComplete(hasPhone && hasAddress);
+        } catch (error) {
+          if (isActive) setIsProfileComplete(false);
+        }
+      };
+      fetchProfile();
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   const handleAddToCart = () => {
     if (!item) return;
@@ -102,6 +157,18 @@ export default function ProductDetail({ navigation, route }) {
     if (!item) return;
     if (!isPurchaseQuantityValid) {
       Alert.alert("จำนวนไม่ถูกต้อง", "กรุณาเลือกจำนวนสินค้าให้ถูกต้อง");
+      return;
+    }
+    if (isProfileComplete === false) {
+      closeBuySheet();
+      Alert.alert(
+        "ข้อมูลโปรไฟล์ไม่ครบ",
+        "กรุณาเพิ่มเบอร์โทรศัพท์และที่อยู่ก่อนทำการสั่งซื้อ",
+        [
+          { text: "เปิดการตั้งค่า", onPress: navigateToProfile },
+          { text: "ปิด", style: "cancel" },
+        ]
+      );
       return;
     }
     const normalizedQuantity = Math.max(
