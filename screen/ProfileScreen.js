@@ -10,9 +10,12 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { auth, db } from "../firebase/firebaseConfig";
 import {
   doc,
@@ -26,8 +29,10 @@ import { signOut } from "firebase/auth";
 const GEO_DATA = require("../geo/geography.json");
 
 const PRIMARY_BLUE = "#0C7FDA";
-const CARD_BG = "#ffffffff";
+const CARD_BG = "#ffffff";
 const INPUT_BG = "#E9EBEF";
+const CLOUDINARY_CLOUD_NAME = "di854zkud";
+const CLOUDINARY_UNSIGNED_PRESET = "mobile_unsigned";
 
 const SelectField = ({ label, value, placeholder, onPress, disabled }) => (
   <View style={styles.inputBlock}>
@@ -36,6 +41,7 @@ const SelectField = ({ label, value, placeholder, onPress, disabled }) => (
       style={[styles.selectBox, disabled && styles.selectBoxDisabled]}
       onPress={onPress}
       disabled={disabled}
+      activeOpacity={0.85}
     >
       <Text
         style={[
@@ -89,13 +95,45 @@ const OptionModal = ({ visible, onClose, onSelect, title, options }) => (
   </Modal>
 );
 
+const uploadToCloudinary = async (asset) => {
+  const file = {
+    uri: asset.uri,
+    type: asset.mimeType || "image/jpeg",
+    name: asset.fileName || `avatar_${Date.now()}.jpg`,
+  };
+
+  const body = new FormData();
+  body.append("file", file);
+  body.append("upload_preset", CLOUDINARY_UNSIGNED_PRESET);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    {
+      method: "POST",
+      body,
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.error?.message || "Upload failed");
+  }
+  return {
+    url: data.secure_url,
+    publicId: data.public_id,
+  };
+};
+
 export default function ProfileScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [profile, setProfile] = useState({
     username: "",
     email: "",
     photoUrl: "",
+    photoPublicId: "",
+    phone: "",
   });
   const [address, setAddress] = useState({
     provinceCode: null,
@@ -114,6 +152,7 @@ export default function ProfileScreen({ navigation }) {
     options: [],
     title: "",
   });
+  const [phoneError, setPhoneError] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -131,6 +170,7 @@ export default function ProfileScreen({ navigation }) {
             username: data.username ?? "",
             email: data.email ?? user.email ?? "",
             photoUrl: data.photoUrl ?? "",
+            photoPublicId: data.photoPublicId ?? "",
           });
 
           if (data.address) {
@@ -145,11 +185,6 @@ export default function ProfileScreen({ navigation }) {
               postalCode: addr.postalCode ? String(addr.postalCode) : "",
               detail: addr.detail ?? "",
             });
-          } else {
-            setAddress((prev) => ({
-              ...prev,
-              detail: "",
-            }));
           }
         } else {
           setProfile((prev) => ({
@@ -269,6 +304,37 @@ export default function ProfileScreen({ navigation }) {
     closePicker();
   };
 
+  const handlePickAvatar = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission needed", "Please allow photo library access.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+
+      setAvatarUploading(true);
+      const uploaded = await uploadToCloudinary(result.assets[0]);
+      setProfile((prev) => ({
+        ...prev,
+        photoUrl: uploaded.url,
+        photoPublicId: uploaded.publicId,
+      }));
+    } catch (error) {
+      Alert.alert("Upload failed", "Could not change photo. Please try again.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut(auth);
@@ -286,9 +352,19 @@ export default function ProfileScreen({ navigation }) {
         return;
       }
 
+      const trimmedPhone = (profile.phone || "").replace(/\D/g, "");
+      if (!/^\d{10}$/.test(trimmedPhone)) {
+        setPhoneError("Phone number must be 10 digits");
+        return;
+      }
+      setPhoneError("");
+
       setSaving(true);
       const docRef = doc(db, "users", user.uid);
       const payload = {
+        photoUrl: profile.photoUrl ?? "",
+        photoPublicId: profile.photoPublicId ?? "",
+        phone: trimmedPhone,
         updatedAt: serverTimestamp(),
         address: {
           provinceCode: address.provinceCode,
@@ -304,12 +380,13 @@ export default function ProfileScreen({ navigation }) {
 
       try {
         await updateDoc(docRef, payload);
-      } catch (e) {
+      } catch (error) {
         await setDoc(docRef, payload, { merge: true });
       }
-      Alert.alert("สำเร็จ", "บันทึกข้อมูลเรียบร้อย");
+      setProfile((prev) => ({ ...prev, phone: trimmedPhone }));
+      Alert.alert("Saved", "Profile updated successfully.");
     } catch (error) {
-      Alert.alert("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลได้");
+      Alert.alert("Save failed", "Could not save profile.");
     } finally {
       setSaving(false);
     }
@@ -322,7 +399,7 @@ export default function ProfileScreen({ navigation }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.safeArea, { justifyContent: "center" }]}>
+      <SafeAreaView style={[styles.safeArea, styles.loadingContainer]}>
         <StatusBar backgroundColor="#f5f7fa" barStyle="dark-content" />
         <ActivityIndicator size="large" color={PRIMARY_BLUE} />
       </SafeAreaView>
@@ -332,22 +409,42 @@ export default function ProfileScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar backgroundColor="#f5f7fa" barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.card}>
-          <View style={styles.avatarWrapper}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>User name</Text>
-            <View style={styles.readonlyBox}>
-              <Text style={styles.readonlyText}>
-                {profile.username || "-"}
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.avatarWrapper}
+              activeOpacity={0.85}
+              onPress={handlePickAvatar}
+            >
+              <View style={styles.avatarCircle}>
+                {profile.photoUrl ? (
+                  <Image
+                    source={{ uri: profile.photoUrl }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Text style={styles.avatarText}>{initials}</Text>
+                )}
+                {avatarUploading && (
+                  <View style={styles.avatarOverlay}>
+                    <ActivityIndicator color="#fff" />
+                  </View>
+                )}
+              </View>
+              <Text style={styles.avatarHint}>
+                {avatarUploading ? "Uploading..." : "Tap to change photo"}
               </Text>
+            </TouchableOpacity>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>User name</Text>
+              <View style={styles.readonlyBox}>
+                <Text style={styles.readonlyText}>
+                  {profile.username || "-"}
+                </Text>
+              </View>
             </View>
-          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Email</Text>
@@ -356,56 +453,77 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
 
-          <View style={[styles.section, { marginTop: 20 }]}>
-            <Text style={styles.sectionHeader}>Address</Text>
-            <View style={styles.selectRow}>
-              <SelectField
-                label="Province"
-                value={address.provinceName}
-                placeholder="Select province"
-                onPress={() => openPicker("province")}
-              />
-              <SelectField
-                label="District"
-                value={address.districtName}
-                placeholder="Select district"
-                onPress={() => openPicker("district")}
-                disabled={!address.provinceCode}
-              />
-            </View>
-            <View style={styles.selectRow}>
-              <SelectField
-                label="Subdistrict"
-                value={address.subdistrictName}
-                placeholder="Select subdistrict"
-                onPress={() => openPicker("subdistrict")}
-                disabled={!address.districtCode}
-              />
-              <View style={styles.inputBlock}>
-                <Text style={styles.inputLabel}>Postal code</Text>
-                <View style={styles.readonlyBox}>
-                  <Text style={styles.readonlyText}>
-                    {address.postalCode || "-"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.inputBlock}>
-              <Text style={styles.inputLabel}>Address details</Text>
-              <TextInput
-                style={styles.multilineInput}
-                value={address.detail}
-                onChangeText={(text) =>
-                  setAddress((prev) => ({ ...prev, detail: text }))
-                }
-                placeholder="House number, alley, village, road"
-                multiline
-                numberOfLines={3}
-              />
-            </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Phone</Text>
+            <TextInput
+              style={[styles.textInput, phoneError && styles.inputError]}
+              keyboardType="number-pad"
+              maxLength={10}
+              value={profile.phone}
+              onChangeText={(text) =>
+                setProfile((prev) => ({
+                  ...prev,
+                  phone: text.replace(/[^0-9]/g, ""),
+                }))
+              }
+              placeholder="Enter phone number"
+            />
+            {!!phoneError && <Text style={styles.errorText}>{phoneError}</Text>}
           </View>
 
+          <View style={[styles.section, { marginTop: 20 }]}>
+              <Text style={styles.sectionHeader}>Address</Text>
+              <View style={styles.selectRow}>
+                <SelectField
+                  label="Province"
+                  value={address.provinceName}
+                  placeholder="Select province"
+                  onPress={() => openPicker("province")}
+                />
+                <SelectField
+                  label="District"
+                  value={address.districtName}
+                  placeholder="Select district"
+                  onPress={() => openPicker("district")}
+                  disabled={!address.provinceCode}
+                />
+              </View>
+              <View style={styles.selectRow}>
+                <SelectField
+                  label="Subdistrict"
+                  value={address.subdistrictName}
+                  placeholder="Select subdistrict"
+                  onPress={() => openPicker("subdistrict")}
+                  disabled={!address.districtCode}
+                />
+                <View style={styles.inputBlock}>
+                  <Text style={styles.inputLabel}>Postal code</Text>
+                  <View style={styles.readonlyBox}>
+                    <Text style={styles.readonlyText}>
+                      {address.postalCode || "-"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.inputBlock}>
+                <Text style={styles.inputLabel}>Address details</Text>
+                <TextInput
+                  style={styles.multilineInput}
+                  value={address.detail}
+                  onChangeText={(text) =>
+                    setAddress((prev) => ({ ...prev, detail: text }))
+                  }
+                  placeholder="House number, alley, village, road"
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.buttonBar}>
           <TouchableOpacity
             style={[styles.primaryButton, saving && { opacity: 0.7 }]}
             onPress={handleSave}
@@ -422,7 +540,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.secondaryButtonText}>Sign out</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
 
       <OptionModal
         visible={pickerState.visible}
@@ -440,8 +558,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f7fa",
   },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 120,
+    paddingTop: 8,
   },
   card: {
     backgroundColor: CARD_BG,
@@ -455,7 +579,7 @@ const styles = StyleSheet.create({
   },
   avatarWrapper: {
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   avatarCircle: {
     width: 100,
@@ -464,11 +588,31 @@ const styles = StyleSheet.create({
     backgroundColor: PRIMARY_BLUE,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   avatarText: {
     fontSize: 40,
     color: "#fff",
     fontWeight: "700",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarHint: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "#666",
   },
   section: {
     marginBottom: 18,
@@ -493,6 +637,23 @@ const styles = StyleSheet.create({
   readonlyText: {
     color: "#333",
     fontSize: 15,
+  },
+  textInput: {
+    backgroundColor: INPUT_BG,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: "#333",
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: "#d32f2f",
+  },
+  errorText: {
+    marginTop: 6,
+    color: "#d32f2f",
+    fontSize: 12,
   },
   selectRow: {
     flexDirection: "row",
@@ -535,11 +696,11 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   primaryButton: {
+    flex: 1,
     backgroundColor: PRIMARY_BLUE,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
-    marginTop: 10,
   },
   primaryButtonText: {
     color: "#fff",
@@ -547,10 +708,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   secondaryButton: {
+    flex: 1,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
-    marginTop: 12,
     borderWidth: 1,
     borderColor: "#cbd2da",
   },
@@ -602,5 +763,15 @@ const styles = StyleSheet.create({
   modalEmpty: {
     paddingVertical: 24,
     alignItems: "center",
+  },
+  buttonBar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    backgroundColor: "#f5f7fa",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: "#dbe0e6",
+    flexDirection: "row",
+    gap: 12,
   },
 });

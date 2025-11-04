@@ -8,9 +8,11 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Crypto from "expo-crypto";
 import {
   onSnapshot,
   collection,
@@ -18,6 +20,7 @@ import {
   getDocs,
   query,
   where,
+  deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase/firebaseConfig";
 
@@ -31,12 +34,60 @@ const emptyItems = CATEGORY_LIST.reduce(
   (acc, item) => ({ ...acc, [item.key]: [] }),
   {}
 );
+const CLOUDINARY_CLOUD_NAME = "di854zkud";
+const CLOUDINARY_API_KEY = "441543967921158";
+const CLOUDINARY_API_SECRET = "6p00fmlLir2kqoM40gPkCb0IWwY";
 
 export default function HomeScreen({ navigation }) {
   const [itemsByCategory, setItemsByCategory] = useState(emptyItems);
   const [role, setRole] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const adminItemsRef = useRef({});
+  const cloudinaryDelete = async (publicId) => {
+    if (!publicId) return;
+    try {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const signature = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA1,
+        `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`
+      );
+      const body = new FormData();
+      body.append("public_id", publicId);
+      body.append("api_key", CLOUDINARY_API_KEY);
+      body.append("timestamp", timestamp.toString());
+      body.append("signature", signature);
+      await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`,
+        { method: "POST", body }
+      );
+    } catch (err) {
+      console.log("Cloudinary delete error:", err);
+    }
+  };
+
+  const handleDeleteItem = (item) => {
+    if (role !== "admin" || item?.ownerId !== userId) return;
+    Alert.alert("Delete item", "Do you want to delete this item?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteDoc(
+              doc(db, "users", item.ownerId, item.category, item.docId)
+            );
+            if (item.publicId) {
+              await cloudinaryDelete(item.publicId);
+            }
+          } catch (error) {
+            Alert.alert("Delete failed", "Unable to delete this item.");
+          }
+        },
+      },
+    ]);
+  };
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -83,11 +134,13 @@ export default function HomeScreen({ navigation }) {
               ...adminItemsRef.current,
               [ownerId]: {
                 ...(adminItemsRef.current[ownerId] || {}),
-                [key]: snapshot.docs.map((docSnap) => ({
-                  id: `${ownerId}_${docSnap.id}`,
-                  ownerId,
-                  ...docSnap.data(),
-                })),
+              [key]: snapshot.docs.map((docSnap) => ({
+                id: `${ownerId}_${docSnap.id}`,
+                ownerId,
+                docId: docSnap.id,
+                category: key,
+                ...docSnap.data(),
+              })),
               },
             };
             rebuildFromCache();
@@ -149,6 +202,7 @@ export default function HomeScreen({ navigation }) {
     }
 
     const userDocRef = doc(db, "users", user.uid);
+    setUserId(user.uid);
     const unsubscribeUser = onSnapshot(userDocRef, (snap) => {
       const data = snap.data();
       setRole(data?.role ?? "customer");
@@ -222,6 +276,15 @@ export default function HomeScreen({ navigation }) {
                               </View>
                             </View>
                           </TouchableOpacity>
+                          {role === "admin" && userId === item.ownerId && (
+                            <TouchableOpacity
+                              style={styles.deleteButton}
+                              onPress={() => handleDeleteItem(item)}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name="close" size={16} color="#fff" />
+                            </TouchableOpacity>
+                          )}
                         </View>
                       ))
                     )}
@@ -281,6 +344,7 @@ const styles = StyleSheet.create({
   },
   itemCardWrapper: {
     marginRight: 12,
+    position: "relative",
   },
   itemImage: {
     width: "100%",
@@ -327,6 +391,23 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#999",
   },
+  deleteButton: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#d32f2f",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    zIndex: 10,
+  },
   fab: {
     position: "absolute",
     bottom: 24,
@@ -349,3 +430,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
+
