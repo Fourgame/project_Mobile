@@ -1,72 +1,80 @@
 import { StyleSheet } from "react-native";
 
+const BACKGROUND = "#04162A";
+const INPUT_BG = "#1B2A40";
+const ACCENT = "#F64F4F";
+
 export const styles = StyleSheet.create({
-
-  bg: {
+  container: {
     flex: 1,
-    backgroundColor: "#EEFCDC",
+    backgroundColor: BACKGROUND,
+  },
+  safeArea: {
+    flex: 1,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-    
+    paddingHorizontal: 32,
   },
-
-  box: {
+  content: {
     width: "100%",
-    backgroundColor: "white",
-    borderTopLeftRadius: 40,
-    borderBottomRightRadius: 40,
+    maxWidth: 360,
     alignItems: "center",
-    paddingVertical: 30,
-    paddingHorizontal: 25,
-
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 5,
   },
-
+  header: {
+    alignItems: "center",
+    marginBottom: 48,
+    gap: 16,
+  },
   logo: {
-    width: 200,
-    aspectRatio: 1,
-    marginBottom: 10,
+    width: 96,
+    height: 96,
     resizeMode: "contain",
   },
-
+  brandText: {
+    fontSize: 26,
+    fontWeight: "700",
+    letterSpacing: 4,
+    color: "#ffffff",
+  },
+  form: {
+    width: "100%",
+  },
   inputContainer: {
     width: "100%",
-    borderColor: "#999",
-    borderWidth: 1,
-    borderRadius: 20,
-    marginVertical: 8,
-    backgroundColor: "#fff",
+    backgroundColor: INPUT_BG,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
-
   input: {
-    padding: 12,
-    fontSize: 20,
-    color: "#000",
+    height: 50,
+    fontSize: 16,
+    color: "#F2F5FF",
   },
-
   btn: {
     width: "100%",
-    backgroundColor: "#666",
-    borderRadius: 20,
-    paddingVertical: 12,
+    backgroundColor: ACCENT,
+    borderRadius: 24,
+    paddingVertical: 14,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
-
   btnText: {
-    color: "black",
-    fontSize: 20,
-    fontWeight: "600",
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
-
+  forgotButton: {
+    marginTop: 28,
+  },
   forgotText: {
-    color: "blue",
-    marginTop: 10,
+    color: "#E0E8F5",
+    fontSize: 14,
     textDecorationLine: "underline",
-    alignSelf:"flex-end"
   },
 });

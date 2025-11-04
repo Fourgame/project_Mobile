@@ -23,7 +23,7 @@ import { auth } from "../firebase/firebaseConfig";
 const Drawer = createDrawerNavigator();
 
 export default function MainDrawer() {
-  const LOGO_IMG = { uri: "https://i.ibb.co/yyzQ43h/KU-Logo-PNG.png" };
+  const LOGO_IMG = require("../assets/logo.png");
 
   const CustomDrawerContent = (props) => {
     const handleLogout = async () => {

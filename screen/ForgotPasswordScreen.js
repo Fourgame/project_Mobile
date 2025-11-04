@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { sendPasswordResetEmail } from "firebase/auth";
@@ -13,11 +14,15 @@ import { auth } from "../firebase/firebaseConfig";
 import { styles } from "../styles/ForgotPasswordScreenStyle";
 
 export default function ForgotPasswordScreen({ navigation }) {
+  const LOGO_IMG = require("../assets/logo.png");
   const [email, setEmail] = useState("");
 
   const handleSendReset = async () => {
     const trimmed = email.trim();
-    if (!trimmed) return Alert.alert("Missing email", "Please enter your email.");
+    if (!trimmed) {
+      Alert.alert("Missing email", "Please enter your email.");
+      return;
+    }
 
     try {
       await sendPasswordResetEmail(auth, trimmed);
@@ -28,44 +33,52 @@ export default function ForgotPasswordScreen({ navigation }) {
       );
     } catch (e) {
       const code = e?.code || "";
-      if (code === "auth/invalid-email")
+      if (code === "auth/invalid-email") {
         Alert.alert("Invalid email", "Please enter a valid email address.");
-      else if (code === "auth/user-not-found")
+      } else if (code === "auth/user-not-found") {
         Alert.alert("Not found", "No account found with that email.");
-      else if (code === "auth/network-request-failed")
+      } else if (code === "auth/network-request-failed") {
         Alert.alert("Network error", "Please check your connection.");
-      else
+      } else {
         Alert.alert("Failed", "Could not send reset email. Try again later.");
+      }
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
-      <View style={styles.container}>
-        <Text style={styles.title}>Forgot Password</Text>
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#04162A" barStyle="light-content" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Image source={LOGO_IMG} style={styles.logo} />
+            <Text style={styles.brandText}>NBF</Text>
+          </View>
 
-        <TextInput
-          placeholder="Enter your email"
-          placeholderTextColor="#777"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-        />
+          <Text style={styles.title}>Forgot Password?</Text>
 
-        <TouchableOpacity style={styles.btn} onPress={handleSendReset}>
-          <Text style={styles.btnText}>Send Reset Link</Text>
-        </TouchableOpacity>
+          <TextInput
+            placeholder="Enter your email"
+            placeholderTextColor="#97A4BA"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+          />
 
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backText}>Back to Login</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <TouchableOpacity style={styles.btn} onPress={handleSendReset}>
+            <Text style={styles.btnText}>Send Reset Link</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.backToLoginButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backToLoginText}>Back to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }

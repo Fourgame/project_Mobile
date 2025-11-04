@@ -21,8 +21,22 @@ export default function App() {
     <CartProvider>
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{
+              animation: "fade",
+              contentStyle: { backgroundColor: "#04162A" },
+            }}
+          />
+          <Stack.Screen
+            name="Register"
+            component={RegisterScreen}
+            options={{
+              animation: "fade",
+              contentStyle: { backgroundColor: "#04162A" },
+            }}
+          />
           <Stack.Screen name="MainDrawer" component={MainDrawer} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
