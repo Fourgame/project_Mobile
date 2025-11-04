@@ -131,16 +131,16 @@ export default function MainDrawer() {
         />
 
         <Drawer.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{
-            drawerIcon: ({ color, size, focused }) => (
-              <Ionicons
-                name="list-circle"
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          drawerIcon: ({ color, size, focused }) => (
+            <Ionicons
+                name="person"
                 size={focused ? size + 2 : size}
                 color={color}
               />
-            ),
+          ),
           }}
         />
 

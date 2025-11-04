@@ -7,13 +7,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBsy4EDl7fwEHh5K5fn_XaQ0RfMaxTkdsY",
-  authDomain: "mobile2025-afc6c.firebaseapp.com",
-  projectId: "mobile2025-afc6c",
-  storageBucket: "mobile2025-afc6c.firebasestorage.app",
-  messagingSenderId: "614711073787",
-  appId: "1:614711073787:web:1e4fd068fbd788c13e895e",
-  measurementId: "G-PHL6SSQTF1",
+  apiKey: "AIzaSyDd7SMM4Kma0H3wSFArrG3MyrroTewYyQc",
+  authDomain: "mobile2025-54503.firebaseapp.com",
+  projectId: "mobile2025-54503",
+  storageBucket: "mobile2025-54503.firebasestorage.app",
+  messagingSenderId: "1070450136759",
+  appId: "1:1070450136759:web:9fb9b9834b92981e935f32",
+  measurementId: "G-1FVF8BVME4"
 };
 
 // ป้องกัน init ซ้ำตอน reload

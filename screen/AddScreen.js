@@ -57,7 +57,10 @@ export default function AddScreen({ navigation }) {
       console.log("Cloudinary upload error:", data);
       throw new Error(data?.error?.message || "Upload failed");
     }
-    return data.secure_url;
+    return {
+      url: data.secure_url,
+      publicId: data.public_id,
+    };
   };
 
   useEffect(() => {
@@ -123,7 +126,7 @@ export default function AddScreen({ navigation }) {
 
     try {
       setSubmitting(true);
-      let uploadedImageUrl = "";
+      let uploadedImage = null;
 
       const user = auth.currentUser;
       if (!user) {
@@ -133,7 +136,7 @@ export default function AddScreen({ navigation }) {
       }
 
       if (imageAsset?.uri) {
-        uploadedImageUrl = await uploadToCloudinary(imageAsset);
+        uploadedImage = await uploadToCloudinary(imageAsset);
       }
 
       const productsRef = collection(db, "users", user.uid, selectedCategory);
@@ -143,7 +146,8 @@ export default function AddScreen({ navigation }) {
         name: trimmedName,
         detail: trimmedDetail,
         price: numericPrice,
-        picture: uploadedImageUrl,
+        picture: uploadedImage?.url ?? "",
+        publicId: uploadedImage?.publicId ?? "",
         createdAt: serverTimestamp(),
       });
 

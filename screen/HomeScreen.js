@@ -180,39 +180,48 @@ export default function HomeScreen({ navigation }) {
                       </View>
                     ) : (
                       entries.map((item) => (
-                        <View key={item.id} style={styles.itemCard}>
-                          {item.picture ? (
-                            <Image
-                              source={{ uri: item.picture }}
-                              style={styles.itemImage}
-                            />
-                          ) : (
-                            <View style={styles.placeholderImage}>
-                              <Ionicons
-                                name="image-outline"
-                                size={28}
-                                color="#0C7FDA"
-                              />
+                        <View key={item.id} style={styles.itemCardWrapper}>
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => {
+                              const parentNav = navigation.getParent();
+                              if (parentNav) {
+                                parentNav.navigate("ProductDetail", { item });
+                              } else {
+                                navigation.navigate("ProductDetail", { item });
+                              }
+                            }}
+                          >
+                            <View style={styles.itemCard}>
+                              {item.picture ? (
+                                <Image
+                                  source={{ uri: item.picture }}
+                                  style={styles.itemImage}
+                                />
+                              ) : (
+                                <View style={styles.placeholderImage}>
+                                  <Ionicons
+                                    name="image-outline"
+                                    size={28}
+                                    color="#0C7FDA"
+                                  />
+                                </View>
+                              )}
+                              <View style={styles.itemInfo}>
+                                <Text style={styles.itemName}>
+                                  {item.name || "No name"}
+                                </Text>
+                                <Text style={styles.itemPrice}>
+                                  ฿{item.price ?? "-"}
+                                </Text>
+                                {!!item.detail && (
+                                  <Text style={styles.itemDetail} numberOfLines={2}>
+                                    {item.detail}
+                                  </Text>
+                                )}
+                              </View>
                             </View>
-                          )}
-                          <View style={styles.itemInfo}>
-                            <Text style={styles.itemPrice}>
-                              ฿{item.price ?? "-"}
-                            </Text>
-                            {!!item.name && (
-                              <Text style={styles.itemName} numberOfLines={1}>
-                                {item.name}
-                              </Text>
-                            )}
-                            {!!item.detail && (
-                              <Text
-                                style={styles.itemDetail}
-                                numberOfLines={2}
-                              >
-                                {item.detail}
-                              </Text>
-                            )}
-                          </View>
+                          </TouchableOpacity>
                         </View>
                       ))
                     )}
@@ -269,6 +278,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#fff",
+  },
+  itemCardWrapper: {
     marginRight: 12,
   },
   itemImage: {
@@ -293,8 +304,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   itemName: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
     color: "#222",
     marginBottom: 4,
   },
