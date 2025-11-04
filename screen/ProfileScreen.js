@@ -338,7 +338,18 @@ export default function ProfileScreen({ navigation }) {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      navigation.replace("Splash");
+      const parentNav = navigation.getParent?.();
+      const rootNav = parentNav?.getParent?.() ?? parentNav;
+      if (rootNav?.reset) {
+        rootNav.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        });
+      } else if (navigation.replace) {
+        navigation.replace("Login");
+      } else if (navigation.navigate) {
+        navigation.navigate("Login");
+      }
     } catch {
       Alert.alert("Error", "Cannot sign out now.");
     }

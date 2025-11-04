@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Modal,
+  Pressable,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,17 +18,90 @@ import { useCart } from "../context/CartContext";
 export default function ProductDetail({ navigation, route }) {
   const item = route.params?.item;
   const { addToCart } = useCart();
+  const [buySheetVisible, setBuySheetVisible] = useState(false);
+  const [purchaseQuantity, setPurchaseQuantity] = useState("1");
 
   const imageUri = item?.picture || "";
   const price = item?.price;
   const detail = item?.detail ?? "";
   const name = item?.name ?? "";
+  const quantity = item?.quantity;
+  const quantityDisplay =
+    typeof quantity === "number" && quantity >= 0 ? quantity : "-";
+  const availableQuantity =
+    typeof quantity === "number" && quantity > 0 ? quantity : 0;
+  const hasStock = availableQuantity > 0;
+  const currentPurchaseQuantity = parseInt(purchaseQuantity, 10) || 0;
+  const decreaseDisabled = currentPurchaseQuantity <= 1;
+  const increaseDisabled =
+    !hasStock || currentPurchaseQuantity >= availableQuantity;
+  const isPurchaseQuantityValid =
+    hasStock &&
+    currentPurchaseQuantity > 0 &&
+    (availableQuantity === 0 || currentPurchaseQuantity <= availableQuantity);
 
   const handleAddToCart = () => {
     if (!item) return;
     addToCart(item);
     Alert.alert("เพิ่มในตะกร้าแล้ว", "ดูสินค้าในตะกร้าได้ทันที");
     navigation.navigate("MainDrawer", { screen: "Cart" });
+  };
+
+  const openBuySheet = () => {
+    if (!hasStock) {
+      Alert.alert("สินค้าหมด", "ขออภัย สินค้าหมดชั่วคราว");
+      return;
+    }
+    setPurchaseQuantity("1");
+    setBuySheetVisible(true);
+  };
+
+  const closeBuySheet = () => {
+    setBuySheetVisible(false);
+  };
+
+  const handleQuantityInput = (value) => {
+    const digits = value.replace(/[^0-9]/g, "");
+    if (!digits) {
+      setPurchaseQuantity("");
+      return;
+    }
+    const numericValue = Math.min(parseInt(digits, 10) || 0, availableQuantity);
+    if (numericValue <= 0) {
+      setPurchaseQuantity("");
+      return;
+    }
+    setPurchaseQuantity(String(numericValue));
+  };
+
+  const increaseQuantity = () => {
+    if (!hasStock) return;
+    const current = parseInt(purchaseQuantity, 10) || 0;
+    if (current >= availableQuantity) return;
+    setPurchaseQuantity(String(current + 1));
+  };
+
+  const decreaseQuantity = () => {
+    const current = parseInt(purchaseQuantity, 10) || 0;
+    if (current <= 1) return;
+    setPurchaseQuantity(String(current - 1));
+  };
+
+  const handleProceedToCheckout = () => {
+    if (!item) return;
+    if (!isPurchaseQuantityValid) {
+      Alert.alert("จำนวนไม่ถูกต้อง", "กรุณาเลือกจำนวนสินค้าให้ถูกต้อง");
+      return;
+    }
+    const normalizedQuantity = Math.max(
+      1,
+      Math.min(currentPurchaseQuantity, availableQuantity || currentPurchaseQuantity)
+    );
+    closeBuySheet();
+    navigation.navigate("OrderSummary", {
+      item,
+      quantity: normalizedQuantity,
+    });
   };
 
   return (
@@ -52,9 +128,12 @@ export default function ProductDetail({ navigation, route }) {
 
         <View style={styles.textBlock}>
           <Text style={styles.name}>{name || "Unnamed item"}</Text>
-          <Text style={styles.price}>
-            {price !== undefined && price !== null ? `฿ ${price}` : "-"}
-          </Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.price}>
+              {price !== undefined && price !== null ? `฿ ${price}` : "-"}
+            </Text>
+            <Text style={styles.quantityText}>เหลือ {quantityDisplay} ชิ้น</Text>
+          </View>
           {!!detail && <Text style={styles.detail}>{detail}</Text>}
         </View>
       </ScrollView>
@@ -63,10 +142,92 @@ export default function ProductDetail({ navigation, route }) {
         <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart}>
           <Ionicons name="cart-outline" size={22} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.buyButton}>
+        <TouchableOpacity style={styles.tryButton} onPress={() => {}}>
+          <Ionicons
+            name="color-wand-outline"
+            size={18}
+            color="#fff"
+            style={styles.tryIcon}
+          />
+          <Text style={styles.tryButtonText}>Try-On</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.buyButton} onPress={openBuySheet}>
           <Text style={styles.buyButtonText}>Buy now</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={buySheetVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeBuySheet}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={closeBuySheet} />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={styles.modalImage} />
+              ) : (
+                <View style={styles.modalImagePlaceholder}>
+                  <Ionicons name="image-outline" size={28} color="#0C7FDA" />
+                </View>
+              )}
+              <View style={styles.modalHeaderInfo}>
+                <Text style={styles.modalPrice}>
+                  {price !== undefined && price !== null ? `฿ ${price}` : "-"}
+                </Text>
+                <Text style={styles.modalStock}>คงเหลือ {availableQuantity} ชิ้น</Text>
+              </View>
+            </View>
+
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>จำนวน</Text>
+              <View style={styles.quantityControl}>
+                <TouchableOpacity
+                  style={[
+                    styles.quantityButton,
+                    decreaseDisabled && styles.quantityButtonDisabled,
+                  ]}
+                  onPress={decreaseQuantity}
+                  disabled={decreaseDisabled}
+                >
+                  <Ionicons name="remove" size={18} color="#000" />
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.quantityInput}
+                  value={purchaseQuantity}
+                  placeholder="0"
+                  onChangeText={handleQuantityInput}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.quantityButton,
+                    increaseDisabled && styles.quantityButtonDisabled,
+                  ]}
+                  onPress={increaseQuantity}
+                  disabled={increaseDisabled}
+                >
+                  <Ionicons name="add" size={18} color="#000" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.modalBuyButton,
+                !isPurchaseQuantityValid && { opacity: 0.5 },
+              ]}
+              onPress={handleProceedToCheckout}
+              disabled={!isPurchaseQuantityValid}
+            >
+              <Text style={styles.modalBuyButtonText}>Buy now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -124,6 +285,12 @@ const styles = StyleSheet.create({
     borderColor: "#d6d6d6",
     paddingTop: 16,
   },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
   name: {
     fontSize: 20,
     fontWeight: "700",
@@ -134,7 +301,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#0C7FDA",
-    marginBottom: 12,
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#222",
   },
   detail: {
     fontSize: 15,
@@ -158,6 +329,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  tryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0C7FDA",
+    borderRadius: 10,
+    height: 44,
+    paddingHorizontal: 18,
+  },
+  tryIcon: {
+    marginRight: 6,
+  },
+  tryButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
   buyButton: {
     flex: 1,
     backgroundColor: "#0C7FDA",
@@ -167,6 +356,108 @@ const styles = StyleSheet.create({
     height: 44,
   },
   buyButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 28,
+    gap: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  modalImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    resizeMode: "cover",
+    backgroundColor: "#F4F8FC",
+  },
+  modalImagePlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#0C7FDA",
+    backgroundColor: "#F4F8FC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalHeaderInfo: {
+    flex: 1,
+  },
+  modalPrice: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0C7FDA",
+    marginBottom: 6,
+  },
+  modalStock: {
+    fontSize: 15,
+    color: "#222",
+  },
+  modalSection: {
+    gap: 12,
+  },
+  modalLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#222",
+  },
+  quantityControl: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  quantityButton: {
+    width: 42,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#d6d6d6",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  quantityButtonDisabled: {
+    opacity: 0.4,
+  },
+  quantityInput: {
+    width: 70,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#d6d6d6",
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#222",
+    paddingVertical: 0,
+  },
+  modalBuyButton: {
+    backgroundColor: "#0C7FDA",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  modalBuyButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",

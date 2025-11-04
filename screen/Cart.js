@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,15 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
 import { useCart } from "../context/CartContext";
 
-export default function CartScreen() {
-  const { cartItems, removeFromCart } = useCart();
+export default function CartScreen({ navigation }) {
+  const { cartItems, removeFromCart, updateCartQuantity } = useCart();
   const [selected, setSelected] = useState({});
 
   useEffect(() => {
@@ -43,18 +44,122 @@ export default function CartScreen() {
     });
   };
 
+  const getStockForItem = useCallback((item) => {
+    const numeric = Number(item.quantity);
+    if (Number.isFinite(numeric) && numeric >= 0) {
+      return numeric;
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    cartItems.forEach((item) => {
+      const stock = getStockForItem(item);
+      const current = Number.isFinite(item.cartQuantity)
+        ? item.cartQuantity
+        : 1;
+      if (stock === 0 && current !== 0) {
+        updateCartQuantity(item.cartId, 0);
+      } else if (stock !== null && stock > 0 && current > stock) {
+        updateCartQuantity(item.cartId, stock);
+      } else if (stock !== 0 && current < 1) {
+        updateCartQuantity(item.cartId, 1);
+      }
+    });
+  }, [cartItems, getStockForItem, updateCartQuantity]);
+
+  const increaseQuantity = (item) => {
+    const stock = getStockForItem(item);
+    if (stock === 0) return;
+    const current = Number.isFinite(item.cartQuantity)
+      ? item.cartQuantity
+      : 1;
+    const next = current + 1;
+    if (stock !== null && next > stock) return;
+    updateCartQuantity(item.cartId, next);
+  };
+
+  const decreaseQuantity = (item) => {
+    const stock = getStockForItem(item);
+    const current = Number.isFinite(item.cartQuantity)
+      ? item.cartQuantity
+      : stock === 0
+      ? 0
+      : 1;
+    if (current <= 1 && stock !== 0) return;
+    const next = Math.max(stock === 0 ? 0 : 1, current - 1);
+    updateCartQuantity(item.cartId, next);
+  };
+
   const { totalPrice, selectedCount } = useMemo(() => {
     let count = 0;
     let total = 0;
     cartItems.forEach((item) => {
       if (selected[item.cartId]) {
+        const quantity = Number.isFinite(item.cartQuantity)
+          ? item.cartQuantity
+          : 1;
+        if (!(quantity > 0)) {
+          return;
+        }
         count += 1;
         const numericPrice = Number(item.price);
-        total += Number.isFinite(numericPrice) ? numericPrice : 0;
+        total += Number.isFinite(numericPrice)
+          ? numericPrice * quantity
+          : 0;
       }
     });
     return { totalPrice: total, selectedCount: count };
   }, [cartItems, selected]);
+
+  const selectedItems = useMemo(
+    () =>
+      cartItems.filter((item) => {
+        if (!selected[item.cartId]) return false;
+        if (Number.isFinite(item.cartQuantity)) {
+          return item.cartQuantity > 0;
+        }
+        return true;
+      }),
+    [cartItems, selected]
+  );
+
+  const paymentDisabled = selectedItems.length === 0;
+
+  const handlePayment = () => {
+    if (paymentDisabled) {
+      Alert.alert("ยังไม่ได้เลือกสินค้า", "กรุณาเลือกสินค้าที่ต้องการชำระ");
+      return;
+    }
+
+    const payloadItems = selectedItems
+      .map((product) => {
+        const numericQuantity = Number(product.cartQuantity);
+        const quantity = Number.isFinite(numericQuantity)
+          ? Math.max(1, Math.floor(numericQuantity))
+          : 1;
+        if (quantity <= 0) {
+          return null;
+        }
+        return {
+          item: product,
+          quantity,
+        };
+      })
+      .filter(Boolean);
+
+    if (payloadItems.length === 0) {
+      Alert.alert("จำนวนสินค้าไม่ถูกต้อง", "กรุณาตรวจสอบจำนวนสินค้าก่อนชำระ");
+      return;
+    }
+
+    const parentNav = navigation?.getParent?.();
+    if (parentNav) {
+      parentNav.navigate("OrderSummary", { items: payloadItems });
+    } else if (navigation?.navigate) {
+      navigation.navigate("OrderSummary", { items: payloadItems });
+    }
+  };
 
   const formattedTotal = useMemo(
     () =>
@@ -75,60 +180,104 @@ export default function CartScreen() {
           </View>
         ) : (
           <View style={styles.listCard}>
-            {cartItems.map((item) => (
-              <Swipeable
-                key={item.cartId}
-                renderRightActions={() => (
-                  <TouchableOpacity
-                    style={styles.deleteAction}
-                    onPress={() => handleDelete(item.cartId)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="trash" size={18} color="#fff" />
-                  </TouchableOpacity>
-                )}
-              >
-                <View style={styles.itemRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.checkbox,
-                      selected[item.cartId] && styles.checkboxSelected,
-                    ]}
-                    onPress={() => toggleSelect(item.cartId)}
-                    activeOpacity={0.8}
-                  >
-                    {selected[item.cartId] && (
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                    )}
-                  </TouchableOpacity>
+            {cartItems.map((item) => {
+              const stock = getStockForItem(item);
+              const remainingText =
+                stock === null ? "คงเหลือ - ชิ้น" : `คงเหลือ ${stock} ชิ้น`;
+              const quantity =
+                Number.isFinite(item.cartQuantity) && item.cartQuantity >= 0
+                  ? item.cartQuantity
+                  : stock === 0
+                  ? 0
+                  : 1;
+              const decreaseDisabled =
+                (stock === 0 && quantity <= 0) ||
+                (stock !== 0 && quantity <= 1);
+              const increaseDisabled =
+                stock === 0 ||
+                (stock !== null && quantity >= stock);
 
-                  {item.picture ? (
-                    <Image source={{ uri: item.picture }} style={styles.itemImage} />
-                  ) : (
-                    <View style={styles.imagePlaceholder}>
-                      <Ionicons name="image-outline" size={22} color="#0C7FDA" />
-                    </View>
+              return (
+                <Swipeable
+                  key={item.cartId}
+                  renderRightActions={() => (
+                    <TouchableOpacity
+                      style={styles.deleteAction}
+                      onPress={() => handleDelete(item.cartId)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="trash" size={18} color="#fff" />
+                    </TouchableOpacity>
                   )}
+                >
+                  <View style={styles.itemRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.checkbox,
+                        selected[item.cartId] && styles.checkboxSelected,
+                      ]}
+                      onPress={() => toggleSelect(item.cartId)}
+                      activeOpacity={0.8}
+                    >
+                      {selected[item.cartId] && (
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      )}
+                    </TouchableOpacity>
 
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName} numberOfLines={1}>
-                      {item.name || "Unnamed item"}
-                    </Text>
-                    <Text style={styles.itemDetail} numberOfLines={2}>
-                      {item.detail || ""}
-                    </Text>
+                    {item.picture ? (
+                      <Image source={{ uri: item.picture }} style={styles.itemImage} />
+                    ) : (
+                      <View style={styles.imagePlaceholder}>
+                        <Ionicons name="image-outline" size={22} color="#0C7FDA" />
+                      </View>
+                    )}
+
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName} numberOfLines={1}>
+                        {item.name || "Unnamed item"}
+                      </Text>
+                      <Text style={styles.itemDetail} numberOfLines={2}>
+                        {item.detail || ""}
+                      </Text>
+                    </View>
+
+                    <View style={styles.itemActions}>
+                      <Text style={styles.rowPrice}>
+                        ฿{" "}
+                        {Number(item.price || 0).toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </Text>
+                      <Text style={styles.stockText}>{remainingText}</Text>
+                      <View style={styles.quantityRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.quantityButton,
+                            decreaseDisabled && styles.quantityButtonDisabled,
+                          ]}
+                          onPress={() => decreaseQuantity(item)}
+                          disabled={decreaseDisabled}
+                        >
+                          <Ionicons name="remove" size={16} color="#000" />
+                        </TouchableOpacity>
+                        <Text style={styles.quantityValue}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.quantityButton,
+                            increaseDisabled && styles.quantityButtonDisabled,
+                          ]}
+                          onPress={() => increaseQuantity(item)}
+                          disabled={increaseDisabled}
+                        >
+                          <Ionicons name="add" size={16} color="#000" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   </View>
-
-                  <Text style={styles.rowPrice}>
-                    ฿{" "}
-                    {Number(item.price || 0).toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </Text>
-                </View>
-              </Swipeable>
-            ))}
+                </Swipeable>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -143,7 +292,15 @@ export default function CartScreen() {
 
         <Text style={styles.totalText}>฿ {formattedTotal}</Text>
 
-        <TouchableOpacity style={styles.paymentButton} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={[
+            styles.paymentButton,
+            paymentDisabled && styles.paymentButtonDisabled,
+          ]}
+          activeOpacity={0.9}
+          onPress={handlePayment}
+          disabled={paymentDisabled}
+        >
           <Text style={styles.paymentText}>Payment ({selectedCount})</Text>
         </TouchableOpacity>
       </View>
@@ -222,6 +379,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  itemActions: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+    minWidth: 120,
+    gap: 6,
+  },
   itemName: {
     fontSize: 16,
     fontWeight: "600",
@@ -237,6 +400,35 @@ const styles = StyleSheet.create({
     color: "#0C7FDA",
     minWidth: 70,
     textAlign: "right",
+  },
+  stockText: {
+    fontSize: 12,
+    color: "#666",
+  },
+  quantityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  quantityButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#c9d5e2",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  quantityButtonDisabled: {
+    opacity: 0.4,
+  },
+  quantityValue: {
+    minWidth: 28,
+    textAlign: "center",
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#222",
   },
   footer: {
     flexDirection: "row",
@@ -280,6 +472,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     height: 44,
+  },
+  paymentButtonDisabled: {
+    opacity: 0.5,
   },
   paymentText: {
     color: "#fff",

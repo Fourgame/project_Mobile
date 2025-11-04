@@ -28,6 +28,7 @@ const CLOUDINARY_UNSIGNED_PRESET = "mobile_unsigned";
 export default function AddScreen({ navigation }) {
   const [selectedCategory, setSelectedCategory] = useState("shirt");
   const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [detail, setDetail] = useState("");
   const [imageAsset, setImageAsset] = useState(null);
@@ -104,16 +105,47 @@ export default function AddScreen({ navigation }) {
     }
   };
 
+  const handleQuantityChange = (value) => {
+    const digitsOnly = value.replace(/[^0-9]/g, "");
+    if (!digitsOnly) {
+      setQuantity("");
+      return;
+    }
+    const numericValue = Number(digitsOnly);
+    if (Number.isNaN(numericValue)) {
+      return;
+    }
+    if (numericValue > 100) {
+      setQuantity("100");
+      return;
+    }
+    setQuantity(digitsOnly);
+  };
+
   const handleAdd = async () => {
     const trimmedDetail = detail.trim();
     const trimmedName = name.trim();
     const numericPrice = Number(price);
+    const numericQuantity = Number(quantity);
     if (!trimmedName) {
       Alert.alert("ชื่อสินค้าไม่ถูกต้อง", "กรุณากรอกชื่อสินค้า");
       return;
     }
     if (!price || Number.isNaN(numericPrice)) {
       Alert.alert("ราคาผิดพลาด", "กรุณากรอกตัวเลขสำหรับราคา");
+      return;
+    }
+    if (!quantity) {
+      Alert.alert("จำนวนสินค้าไม่ถูกต้อง", "กรุณากรอกจำนวนสินค้า");
+      return;
+    }
+    if (
+      Number.isNaN(numericQuantity) ||
+      !Number.isInteger(numericQuantity) ||
+      numericQuantity <= 0 ||
+      numericQuantity > 100
+    ) {
+      Alert.alert("จำนวนสินค้าไม่ถูกต้อง", "กรุณากรอกตัวเลข 1 ถึง 100");
       return;
     }
 
@@ -146,6 +178,7 @@ export default function AddScreen({ navigation }) {
         name: trimmedName,
         detail: trimmedDetail,
         price: numericPrice,
+        quantity: numericQuantity,
         picture: uploadedImage?.url ?? "",
         publicId: uploadedImage?.publicId ?? "",
         createdAt: serverTimestamp(),
@@ -153,6 +186,7 @@ export default function AddScreen({ navigation }) {
 
       Alert.alert("สำเร็จ", "เพิ่มรายการเรียบร้อย");
       setName("");
+      setQuantity("");
       setPrice("");
       setDetail("");
       setImageAsset(null);
@@ -214,6 +248,18 @@ export default function AddScreen({ navigation }) {
             value={name}
             onChangeText={setName}
             placeholder="Enter product name"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Quantity</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="number-pad"
+            value={quantity}
+            onChangeText={handleQuantityChange}
+            placeholder="Enter quantity (max 100)"
+            maxLength={3}
           />
         </View>
 

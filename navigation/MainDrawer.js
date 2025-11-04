@@ -97,7 +97,7 @@ export default function MainDrawer() {
               onPress={() => navigation.toggleDrawer()}
               style={{ marginLeft: 16 }}
             >
-              <Ionicons name="menu" size={26} color="#0C7FDA" />
+              <Ionicons name="menu" size={26} color="#000000ff" />
             </TouchableOpacity>
           ),
         })}
