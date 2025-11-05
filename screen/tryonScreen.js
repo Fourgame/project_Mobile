@@ -149,42 +149,38 @@ export default function TryOnScreen({ navigation, route }) {
   const downloadEnabled = !!resultImage;
   const canProceedToPayment = productImages.length > 0;
 
-const requestMediaPermission = async () => {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (permission.status !== "granted") {
-    Alert.alert(
-      "Permission required",
-      "Please allow photo library access to continue."
-    );
-    return false;
-  }
-  return true;
-};
+  const requestMediaPermission = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission required",
+        "Please allow photo library access to continue."
+      );
+      return false;
+    }
+    return true;
+  };
 
-const pickPersonImage = async () => {
-  const allowed = await requestMediaPermission();
-  if (!allowed) {
-    return;
-  }
-  const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaType.Images,
-    quality: 1,
-  });
-  if (!res.canceled) {
-    setPersonImage(res.assets[0].uri);
+  const pickPersonImage = async () => {
+    const allowed = await requestMediaPermission();
+    if (!allowed) return;
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+    if (!res.canceled) {
+      setPersonImage(res.assets[0].uri);
       setResultImage(null);
     }
   };
 
-const addProductImage = async () => {
-  const allowed = await requestMediaPermission();
-  if (!allowed) {
-    return;
-  }
-  const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaType.Images,
-    quality: 1,
-  });
+  const addProductImage = async () => {
+    const allowed = await requestMediaPermission();
+    if (!allowed) return;
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
     if (!res.canceled) {
       const uri = res.assets[0].uri;
       setProductImages((prev) => [
@@ -201,15 +197,13 @@ const addProductImage = async () => {
     }
   };
 
-const updateProductImage = async (index) => {
-  const allowed = await requestMediaPermission();
-  if (!allowed) {
-    return;
-  }
-  const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaType.Images,
-    quality: 1,
-  });
+  const updateProductImage = async (index) => {
+    const allowed = await requestMediaPermission();
+    if (!allowed) return;
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
     if (!res.canceled) {
       const uri = res.assets[0].uri;
       setProductImages((prev) =>
@@ -224,6 +218,10 @@ const updateProductImage = async (index) => {
       );
     }
   };
+  const removeProductImage = (index) => {
+    setProductImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
 
   const callTryOnOnce = async (personBase64, productBase64) => {
     const resp = await fetch(CLOUD_FN_URL, {
@@ -386,9 +384,6 @@ const handleProceedToCheckout = () => {
         >
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Items to try on</Text>
-            <Text style={styles.helperText}>
-              Review the products that will be applied to the customer photo.
-            </Text>
 
             {productImages.length > 0 ? (
               <View style={styles.productList}>
@@ -444,9 +439,9 @@ const handleProceedToCheckout = () => {
           </View>
 
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Choose the customer photo</Text>
+            <Text style={styles.sectionTitle}>Choose photo to try on</Text>
             <Text style={styles.helperText}>
-              Pick an existing photo or capture a new one to use as the base.
+              Pick an existing photo to use as the base.
             </Text>
             <TouchableOpacity style={styles.button} onPress={pickPersonImage}>
               <Text style={styles.buttonText}>
@@ -501,55 +496,56 @@ const handleProceedToCheckout = () => {
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Try-on result</Text>
               <Image source={{ uri: resultImage }} style={styles.resultImage} />
-            </View>
+                  
+              <View style={styles.shareRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    !shareEnabled && styles.actionButtonDisabled,
+                  ]}
+                  onPress={handleShareResult}
+                  disabled={!shareEnabled}
+                >
+                  <Ionicons
+                    name="share-social-outline"
+                    size={18}
+                    color={shareEnabled ? "#FFFFFF" : "#DFE8FF"}
+                  />
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      !shareEnabled && styles.actionButtonTextDisabled,
+                    ]}
+                  >
+                    Share
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    !downloadEnabled && styles.actionButtonDisabled,
+                  ]}
+                  onPress={handleDownloadResult}
+                  disabled={!downloadEnabled}
+                >
+                  <Ionicons
+                    name="download-outline"
+                    size={18}
+                    color={downloadEnabled ? "#FFFFFF" : "#DFE8FF"}
+                  />
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      !downloadEnabled && styles.actionButtonTextDisabled,
+                    ]}
+                  >
+                    Download
+                  </Text>
+                </TouchableOpacity>
+              </View>
+                </View>
           ) : null}
 
-          <View style={styles.shareRow}>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                !shareEnabled && styles.actionButtonDisabled,
-              ]}
-              onPress={handleShareResult}
-              disabled={!shareEnabled}
-            >
-              <Ionicons
-                name="share-social-outline"
-                size={18}
-                color={shareEnabled ? "#FFFFFF" : "#DFE8FF"}
-              />
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  !shareEnabled && styles.actionButtonTextDisabled,
-                ]}
-              >
-                Share
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                !downloadEnabled && styles.actionButtonDisabled,
-              ]}
-              onPress={handleDownloadResult}
-              disabled={!downloadEnabled}
-            >
-              <Ionicons
-                name="download-outline"
-                size={18}
-                color={downloadEnabled ? "#FFFFFF" : "#DFE8FF"}
-              />
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  !downloadEnabled && styles.actionButtonTextDisabled,
-                ]}
-              >
-                Download
-              </Text>
-            </TouchableOpacity>
-          </View>
 
           <View style={styles.checkoutRow}>
             <TouchableOpacity
