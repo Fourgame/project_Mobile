@@ -225,10 +225,6 @@ const updateProductImage = async (index) => {
     }
   };
 
-  const removeProductImage = (index) => {
-    setProductImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const callTryOnOnce = async (personBase64, productBase64) => {
     const resp = await fetch(CLOUD_FN_URL, {
       method: "POST",
@@ -393,9 +389,6 @@ const handleProceedToCheckout = () => {
             <Text style={styles.helperText}>
               Review the products that will be applied to the customer photo.
             </Text>
-            <TouchableOpacity style={styles.button} onPress={addProductImage}>
-              <Text style={styles.buttonText}>Add product image</Text>
-            </TouchableOpacity>
 
             {productImages.length > 0 ? (
               <View style={styles.productList}>
@@ -432,12 +425,6 @@ const handleProceedToCheckout = () => {
                             No product image yet. Add one to include it in the try-on.
                           </Text>
                         ) : null}
-                        <TouchableOpacity
-                          style={styles.removeButton}
-                          onPress={() => removeProductImage(index)}
-                        >
-                          <Text style={styles.removeText}>Remove</Text>
-                        </TouchableOpacity>
                       </View>
                     </View>
                   );
