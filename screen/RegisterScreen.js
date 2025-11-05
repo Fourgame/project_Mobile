@@ -38,7 +38,7 @@ function InputBox({
       <TextInput
         placeholder={placeholder}
         style={styles.input}
-        placeholderTextColor="#888"
+        placeholderTextColor="#97A4BA"
         secureTextEntry={secureTextEntry}
         value={value}
         onChangeText={onChangeText}
@@ -49,23 +49,29 @@ function InputBox({
   );
 }
 
-function Btn({ text, onPress, disabled }) {
+function Btn({ text, onPress, disabled, variant = "primary" }) {
+  const buttonStyle = [
+    styles.btn,
+    variant === "secondary" && styles.btnSecondary,
+    disabled && styles.btnDisabled,
+  ];
+  const textStyle = [
+    styles.btnText,
+    variant === "secondary" && styles.btnTextSecondary,
+  ];
+
   return (
-    <TouchableOpacity
-      style={[styles.btn, disabled && { opacity: 0.6 }]}
-      onPress={onPress}
-      disabled={disabled}
-    >
+    <TouchableOpacity style={buttonStyle} onPress={onPress} disabled={disabled}>
       {disabled ? (
         <ActivityIndicator color="#fff" />
       ) : (
-        <Text style={styles.btnText}>{text}</Text>
+        <Text style={textStyle}>{text}</Text>
       )}
     </TouchableOpacity>
   );
 }
 export default function RegisterScreen({ navigation }) {
-  const LOGO_IMG = { uri: "https://i.ibb.co/yyzQ43h/KU-Logo-PNG.png" };
+  const LOGO_IMG = require("../assets/logo.png");
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -132,60 +138,66 @@ export default function RegisterScreen({ navigation }) {
 
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEFCDC" }}>
-      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
-
-      {/* Header */}
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#04162A" barStyle="light-content" />
+      <SafeAreaView style={styles.safeArea}>
         <TouchableOpacity
-          style={styles.backBtn}
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={26} color="#333" />
+          <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerText}>Register</Text>
-      </View>
 
-      {/* Content */}
-      <View style={styles.container}>
-        <View style={styles.box}>
-          <View style={styles.logoLayout}>
+        <View style={styles.content}>
+          <View style={styles.header}>
             <Image source={LOGO_IMG} style={styles.logo} />
-            <Text style={styles.logoText}>Registration</Text>
+            <Text style={styles.brandText}>NBF</Text>
           </View>
 
-          <InputBox
-            placeholder="Username"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-          />
-          <InputBox
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <InputBox
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-          <InputBox
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            autoCapitalize="none"
-          />
+          <Text style={styles.title}>Register</Text>
 
-          <Btn text="Register" onPress={handleRegister} disabled={loading} />
-          <Btn text="Cancel" onPress={() => navigation.goBack()} />
+          <View style={styles.form}>
+            <InputBox
+              placeholder="Username"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+            />
+            <InputBox
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <InputBox
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <InputBox
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <Btn
+              text="Register"
+              onPress={handleRegister}
+              disabled={loading}
+            />
+            <Btn
+              text="Cancel"
+              onPress={() => navigation.goBack()}
+              variant="secondary"
+            />
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }

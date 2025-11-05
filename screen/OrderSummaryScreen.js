@@ -8,11 +8,12 @@ import {
   ScrollView,
   ActivityIndicator,
   StatusBar,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebase/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
 
 const PRIMARY_BLUE = "#0C7FDA";
 const BACKGROUND = "#f1f3f6";
@@ -57,6 +58,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
 
   const [address, setAddress] = useState(null);
   const [loadingAddress, setLoadingAddress] = useState(true);
+  const [creatingOrder, setCreatingOrder] = useState(false);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -125,6 +127,43 @@ export default function OrderSummaryScreen({ navigation, route }) {
   })}`;
 
   const paymentDisabled = orderItems.length === 0;
+  const handleCreateOrder = async () => {
+    if (paymentDisabled || creatingOrder) {
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      navigation.replace("Login");
+      return;
+    }
+    try {
+      setCreatingOrder(true);
+      const ordersRef = collection(db, "users", user.uid, "orders");
+      const orderDoc = await addDoc(ordersRef, {
+        status: "pending",
+        totalPrice,
+        createdAt: serverTimestamp(),
+        items: orderItems.map((line) => ({
+          name: line.item?.name ?? "",
+          price: Number(line.item?.price) || 0,
+          quantity: line.quantity,
+          image: line.item?.picture || "",
+          productId: line.item?.docId || line.item?.id || "",
+          category: line.item?.category || "",
+          ownerId: line.item?.ownerId || "",
+        })),
+      });
+      navigation.replace("Payment", {
+        orderId: orderDoc.id,
+        totalPrice,
+      });
+    } catch (error) {
+      console.log("Order creation error:", error);
+      Alert.alert("ไม่สามารถสร้างคำสั่งซื้อ", "กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setCreatingOrder(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -214,12 +253,14 @@ export default function OrderSummaryScreen({ navigation, route }) {
         <TouchableOpacity
           style={[
             styles.summaryButton,
-            paymentDisabled && styles.summaryButtonDisabled,
+            (paymentDisabled || creatingOrder) && styles.summaryButtonDisabled,
           ]}
-          onPress={() => {}}
-          disabled={paymentDisabled}
+          onPress={handleCreateOrder}
+          disabled={paymentDisabled || creatingOrder}
         >
-          <Text style={styles.summaryButtonText}>Buy now</Text>
+          <Text style={styles.summaryButtonText}>
+            {creatingOrder ? "Processing..." : "Buy now"}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

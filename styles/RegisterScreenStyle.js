@@ -1,96 +1,98 @@
 import { StyleSheet } from "react-native";
 
+const BACKGROUND = "#04162A";
+const INPUT_BG = "#1B2A40";
+const ACCENT = "#F64F4F";
+const ACCENT_SECONDARY = "#F87373";
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#EEFCDC",
-    alignItems: "center",    
-    paddingTop: 16,           
+    backgroundColor: BACKGROUND,
   },
-
-  header: {
-    flexDirection: "row",
+  safeArea: {
+    flex: 1,
     alignItems: "center",
-    backgroundColor: "#fff",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
+    paddingHorizontal: 32,
+    paddingTop: 16,
   },
-
-  backBtn: { padding: 4 },
-
-  headerText: {
-    flex: 1,                 
-    textAlign: "center",     
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    marginRight: 30,          
+  backButton: {
+    alignSelf: "flex-start",
+    padding: 8,
+    borderRadius: 18,
   },
-
-  box: {
-    width: "100%",             
-    backgroundColor: "white",
-    borderTopLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    padding: 20,
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-  },
-
-  logo: {
-    width: 120,
-    aspectRatio: 1,
-    resizeMode: "contain",
-  },
-
-  logoText: {
-    fontSize: 30,
-    fontWeight: "700",
-    color: "black",
-  },
-
-  logoLayout: {
-    flexDirection: "row",
+  content: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 360,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    marginBottom: 14,
-    alignSelf:'flex-start'
+    alignSelf: "center",
+    paddingTop: 24,
   },
-    inputContainer: {
-    width: "100%",
-    borderColor: "#999",
-    borderWidth: 1,
-    borderRadius: 20,
-    marginVertical: 8,
-    backgroundColor: "#fff",
-  },
-
-  input: {
-    padding: 10,
-    fontSize: 20,
-    color: "#000",
-  },
-   btn: {
-    width: "100%",
-    backgroundColor: "#666",
-    borderRadius: 20,
-    paddingVertical: 12,
+  header: {
     alignItems: "center",
-    marginTop: 12,
+    gap: 16,
+    marginBottom: 24,
   },
-
+  logo: {
+    width: 96,
+    height: 96,
+    resizeMode: "contain",
+  },
+  brandText: {
+    fontSize: 26,
+    fontWeight: "700",
+    letterSpacing: 4,
+    color: "#ffffff",
+  },
+  title: {
+    alignSelf: "flex-start",
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#ffffff",
+    marginBottom: 24,
+  },
+  form: {
+    width: "100%",
+  },
+  inputContainer: {
+    width: "100%",
+    backgroundColor: INPUT_BG,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  input: {
+    height: 50,
+    fontSize: 16,
+    color: "#F2F5FF",
+  },
+  btn: {
+    width: "100%",
+    backgroundColor: ACCENT,
+    borderRadius: 24,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  btnSecondary: {
+    backgroundColor: ACCENT_SECONDARY,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
   btnText: {
-    color: "black",
-    fontSize: 20,
-    fontWeight: "600",
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  btnTextSecondary: {
+    color: "#fff",
   },
 });

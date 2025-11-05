@@ -26,7 +26,7 @@ function InputBox({
       <TextInput
         placeholder={placeholder}
         style={styles.input}
-        placeholderTextColor="#888"
+        placeholderTextColor="#97A4BA"
         secureTextEntry={secureTextEntry}
         value={value}
         onChangeText={onChangeText}
@@ -46,9 +46,7 @@ function Btn({ text, onPress }) {
 }
 
 export default function LoginScreen({ navigation }) {
-  const LOGO_IMG = {
-    uri: "https://i.ibb.co/yyzQ43h/KU-Logo-PNG.png",
-  };
+  const LOGO_IMG = require("../assets/logo.png");
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -94,31 +92,37 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#EEFCDC" }}>
-      <SafeAreaView style={styles.bg}>
-        <StatusBar backgroundColor="#EEFCDC" barStyle="dark-content" />
-        <View style={styles.box}>
-          <Image source={LOGO_IMG} style={styles.logo} />
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#04162A" barStyle="light-content" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Image source={LOGO_IMG} style={styles.logo} />
+            <Text style={styles.brandText}>NBF</Text>
+          </View>
 
+          <View style={styles.form}>
+            <InputBox
+              placeholder="Email or Username"
+              value={identifier}
+              onChangeText={setIdentifier}
+            />
+            <InputBox
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
 
-          <InputBox
-            placeholder="Email or Username"
-            value={identifier}
-            onChangeText={setIdentifier}
-          />
-          <InputBox
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+            <Btn text="Sign in" onPress={handleLogin} />
+            <Btn text="Sign up" onPress={() => navigation.navigate("Register")} />
+          </View>
 
-
-          <Btn text="Sign in" onPress={handleLogin} />
-          <Btn text="Sign up" onPress={() => navigation.navigate("Register")} />
-
-          <TouchableOpacity style={styles.forgotText} onPress={() => navigation.navigate("ForgotPassword")}>
-            <Text style={styles.forgotText}>Forgot Password ?</Text>
+          <TouchableOpacity
+            style={styles.forgotButton}
+            onPress={() => navigation.navigate("ForgotPassword")}
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

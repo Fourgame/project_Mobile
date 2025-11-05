@@ -17,13 +17,14 @@ import {
 
 import HomeScreen from "../screen/HomeScreen";
 import CartScreen from "../screen/Cart";
+import ListScreen from "../screen/ListScreen";
 import ProfileScreen from "../screen/ProfileScreen";
 import { auth } from "../firebase/firebaseConfig";
 
 const Drawer = createDrawerNavigator();
 
 export default function MainDrawer() {
-  const LOGO_IMG = { uri: "https://i.ibb.co/yyzQ43h/KU-Logo-PNG.png" };
+  const LOGO_IMG = require("../assets/logo.png");
 
   const CustomDrawerContent = (props) => {
     const handleLogout = async () => {
@@ -70,15 +71,15 @@ export default function MainDrawer() {
 
   return (
     <>
-      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
+      <StatusBar backgroundColor="#031C30" barStyle="light-content" />
       <Drawer.Navigator
         initialRouteName="Home"
         drawerContent={(props) => <CustomDrawerContent {...props} />}
         screenOptions={({ navigation }) => ({
-          headerStyle: { backgroundColor: "#fff" },
+          headerStyle: { backgroundColor: "#031C30" },
           headerTintColor: "#0C7FDA",
           headerTitleAlign: "center",
-          headerTitleStyle: { color: "#0C7FDA" },
+          headerTitleStyle: { color: "#ffffffff" },
           drawerActiveTintColor: "#fff",
           drawerInactiveTintColor: "#fff",
           drawerActiveBackgroundColor: "rgba(255, 255, 255, 0.15)",
@@ -97,7 +98,7 @@ export default function MainDrawer() {
               onPress={() => navigation.toggleDrawer()}
               style={{ marginLeft: 16 }}
             >
-              <Ionicons name="menu" size={26} color="#000000ff" />
+              <Ionicons name="menu" size={26} color="#ffffffff" />
             </TouchableOpacity>
           ),
         })}
@@ -123,6 +124,19 @@ export default function MainDrawer() {
             drawerIcon: ({ color, size, focused }) => (
               <Ionicons
                 name="cart"
+                size={focused ? size + 2 : size}
+                color={color}
+              />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="List"
+          component={ListScreen}
+          options={{
+            drawerIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name="list"
                 size={focused ? size + 2 : size}
                 color={color}
               />
