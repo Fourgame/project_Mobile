@@ -112,6 +112,25 @@ export default function ProductDetail({ navigation, route }) {
     Alert.alert("Added to cart", "You can review it in your cart.");
     navigation.navigate("MainDrawer", { screen: "Cart" });
   };
+  const handleTryOn = () => {
+    const productItem = item
+      ? [
+          {
+            id: item.id ?? "detail-item",
+            uri: imageUri || null,
+            name,
+            price: Number.isFinite(Number(price)) ? Number(price) : null,
+          },
+        ]
+      : [];
+    navigation.navigate("TryOn", {
+      origin: "ProductDetail",
+      productImage: imageUri || null,
+      productName: name || "",
+      productPrice: price ?? null,
+      productItems: productItem,
+    });
+  };
 
   const openBuySheet = () => {
     if (!hasStock) {
@@ -232,7 +251,7 @@ export default function ProductDetail({ navigation, route }) {
         <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart}>
           <Ionicons name="cart-outline" size={22} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tryButton} onPress={() => {}}>
+        <TouchableOpacity style={styles.tryButton} onPress={handleTryOn}>
           <Ionicons
             name="color-wand-outline"
             size={18}

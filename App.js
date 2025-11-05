@@ -14,6 +14,7 @@ import ProductDetail from './screen/ProductDetail';
 import OrderSummaryScreen from './screen/OrderSummaryScreen';
 import PaymentScreen from './screen/PaymentScreen';
 import CategoryItemsScreen from './screen/CategoryItemsScreen';
+import TryOnScreen from './screen/tryonScreen';
 import { CartProvider } from './context/CartContext';
 
 const Stack = createNativeStackNavigator();
@@ -47,6 +48,7 @@ export default function App() {
           <Stack.Screen name="OrderSummary" component={OrderSummaryScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
           <Stack.Screen name="CategoryItems" component={CategoryItemsScreen} />
+          <Stack.Screen name="TryOn" component={TryOnScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </CartProvider>

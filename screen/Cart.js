@@ -125,6 +125,35 @@ export default function CartScreen({ navigation }) {
   );
 
   const paymentDisabled = selectedItems.length === 0;
+  const handleTryOnFromCart = () => {
+    if (cartItems.length === 0) {
+      Alert.alert("ยังไม่มีสินค้า", "เพิ่มสินค้าในตะกร้าก่อนลองเสื้อ");
+      return;
+    }
+
+    const productItems = cartItems
+      .map((item, index) => {
+        if (!item) return null;
+        const uri =
+          item.picture ||
+          item.image ||
+          item.imageUri ||
+          item.photoUrl ||
+          null;
+        return {
+          id: item.id ?? item.cartId ?? `cart-${index}`,
+          uri: uri || null,
+          name: typeof item.name === "string" ? item.name : "",
+          price: Number.isFinite(Number(item.price)) ? Number(item.price) : null,
+        };
+      })
+      .filter(Boolean);
+
+    navigation.navigate("TryOn", {
+      origin: "Cart",
+      productItems,
+    });
+  };
 
   const handlePayment = () => {
     if (paymentDisabled) {
@@ -283,7 +312,11 @@ export default function CartScreen({ navigation }) {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.tryButton} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={styles.tryButton}
+          activeOpacity={0.9}
+          onPress={handleTryOnFromCart}
+        >
           <Ionicons name="sparkles-outline" size={18} color="#fff" />
           <Text style={styles.tryButtonText}>Try-On</Text>
         </TouchableOpacity>
