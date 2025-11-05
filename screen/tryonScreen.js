@@ -149,9 +149,24 @@ export default function TryOnScreen({ navigation, route }) {
   const downloadEnabled = !!resultImage;
   const canProceedToPayment = productImages.length > 0;
 
+  const ensureMediaPermission = async () => {
+    const { status, granted } =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted" && !granted) {
+      Alert.alert(
+        "Permission required",
+        "Please allow access to your photos to pick images."
+      );
+      return false;
+    }
+    return true;
+  };
+
   const pickPersonImage = async () => {
+    const allowed = await ensureMediaPermission();
+    if (!allowed) return;
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
     });
     if (!res.canceled) {
@@ -160,30 +175,12 @@ export default function TryOnScreen({ navigation, route }) {
     }
   };
 
-  const addProductImage = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      quality: 1,
-    });
-    if (!res.canceled) {
-      const uri = res.assets[0].uri;
-      setProductImages((prev) => [
-        ...prev,
-        {
-          id: `picker-${Date.now().toString(36)}-${Math.random()
-            .toString(36)
-            .slice(2, 8)}`,
-          uri,
-          name: "",
-          price: null,
-        },
-      ]);
-    }
-  };
 
   const updateProductImage = async (index) => {
+    const allowed = await ensureMediaPermission();
+    if (!allowed) return;
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
     });
     if (!res.canceled) {
@@ -199,10 +196,6 @@ export default function TryOnScreen({ navigation, route }) {
         )
       );
     }
-  };
-
-  const removeProductImage = (index) => {
-    setProductImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const callTryOnOnce = async (personBase64, productBase64) => {
@@ -355,9 +348,6 @@ export default function TryOnScreen({ navigation, route }) {
             <Text style={styles.helperText}>
               Review the products that will be applied to the customer photo.
             </Text>
-            <TouchableOpacity style={styles.button} onPress={addProductImage}>
-              <Text style={styles.buttonText}>Add product image</Text>
-            </TouchableOpacity>
 
             {productImages.length > 0 ? (
               <View style={styles.productList}>
@@ -394,12 +384,6 @@ export default function TryOnScreen({ navigation, route }) {
                             No product image yet. Add one to include it in the try-on.
                           </Text>
                         ) : null}
-                        <TouchableOpacity
-                          style={styles.removeButton}
-                          onPress={() => removeProductImage(index)}
-                        >
-                          <Text style={styles.removeText}>Remove</Text>
-                        </TouchableOpacity>
                       </View>
                     </View>
                   );
