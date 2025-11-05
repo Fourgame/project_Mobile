@@ -67,7 +67,7 @@ export default function AddScreen({ navigation }) {
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) {
-      Alert.alert("ไม่พบผู้ใช้", "กรุณาเข้าสู่ระบบอีกครั้ง");
+      Alert.alert("User not found", "Please sign in again.");
       navigation.replace("Login");
       return;
     }
@@ -75,7 +75,7 @@ export default function AddScreen({ navigation }) {
     const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
       const data = snap.data();
       if (!data || data.role !== "admin") {
-        Alert.alert("จำกัดสิทธิ์", "หน้านี้สำหรับผู้ดูแลเท่านั้น");
+        Alert.alert("Restricted access", "This screen is for administrators only.");
         navigation.goBack();
       }
     });
@@ -87,7 +87,7 @@ export default function AddScreen({ navigation }) {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert("ต้องการสิทธิ์", "กรุณาอนุญาตการเข้าถึงรูปภาพ");
+        Alert.alert("Permission required", "Please allow photo library access.");
         return;
       }
 
@@ -101,7 +101,7 @@ export default function AddScreen({ navigation }) {
       }
     } catch (error) {
       console.log("Image pick error:", error);
-      Alert.alert("ไม่สามารถเลือกรูปได้", "กรุณาลองอีกครั้ง");
+      Alert.alert("Unable to select image", "Please try again.");
     }
   };
 
@@ -127,16 +127,21 @@ export default function AddScreen({ navigation }) {
     const trimmedName = name.trim();
     const numericPrice = Number(price);
     const numericQuantity = Number(quantity);
+
     if (!trimmedName) {
-      Alert.alert("ชื่อสินค้าไม่ถูกต้อง", "กรุณากรอกชื่อสินค้า");
+      Alert.alert("Invalid product name", "Please enter a product name.");
       return;
     }
     if (!price || Number.isNaN(numericPrice)) {
-      Alert.alert("ราคาผิดพลาด", "กรุณากรอกตัวเลขสำหรับราคา");
+      Alert.alert("Invalid price", "Please enter a numeric price.");
+      return;
+    }
+    if (numericPrice < 10) {
+      Alert.alert("Invalid price", "Minimum price is 10 baht.");
       return;
     }
     if (!quantity) {
-      Alert.alert("จำนวนสินค้าไม่ถูกต้อง", "กรุณากรอกจำนวนสินค้า");
+      Alert.alert("Invalid quantity", "Please enter a quantity.");
       return;
     }
     if (
@@ -145,13 +150,13 @@ export default function AddScreen({ navigation }) {
       numericQuantity <= 0 ||
       numericQuantity > 100
     ) {
-      Alert.alert("จำนวนสินค้าไม่ถูกต้อง", "กรุณากรอกตัวเลข 1 ถึง 100");
+      Alert.alert("Invalid quantity", "Please enter a number between 1 and 100.");
       return;
     }
 
     const user = auth.currentUser;
     if (!user) {
-      Alert.alert("ไม่พบผู้ใช้", "กรุณาเข้าสู่ระบบอีกครั้ง");
+      Alert.alert("User not found", "Please sign in again.");
       navigation.replace("Login");
       return;
     }
@@ -160,9 +165,9 @@ export default function AddScreen({ navigation }) {
       setSubmitting(true);
       let uploadedImage = null;
 
-      const user = auth.currentUser;
-      if (!user) {
-        Alert.alert("ไม่พบผู้ใช้", "กรุณาเข้าสู่ระบบอีกครั้ง");
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert("User not found", "Please sign in again.");
         navigation.replace("Login");
         return;
       }
@@ -171,7 +176,7 @@ export default function AddScreen({ navigation }) {
         uploadedImage = await uploadToCloudinary(imageAsset);
       }
 
-      const productsRef = collection(db, "users", user.uid, selectedCategory);
+      const productsRef = collection(db, "users", currentUser.uid, selectedCategory);
 
       await addDoc(productsRef, {
         category: selectedCategory,
@@ -184,7 +189,7 @@ export default function AddScreen({ navigation }) {
         createdAt: serverTimestamp(),
       });
 
-      Alert.alert("สำเร็จ", "เพิ่มรายการเรียบร้อย");
+      Alert.alert("Success", "Item added successfully.");
       setName("");
       setQuantity("");
       setPrice("");
@@ -193,7 +198,7 @@ export default function AddScreen({ navigation }) {
       navigation.goBack();
     } catch (error) {
       console.log("Add item error:", error);
-      Alert.alert("เพิ่มไม่สำเร็จ", "กรุณาลองอีกครั้ง");
+      Alert.alert("Unable to add item", "Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -283,8 +288,11 @@ export default function AddScreen({ navigation }) {
             style={styles.input}
             keyboardType="numeric"
             value={price}
-            onChangeText={setPrice}
-            placeholder="Enter price"
+            onChangeText={(value) => {
+              const sanitized = value.replace(/[^0-9.]/g, "");
+              setPrice(sanitized);
+            }}
+            placeholder="Enter price (atleast 10 THB)"
           />
         </View>
 

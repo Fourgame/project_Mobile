@@ -109,13 +109,13 @@ export default function ProductDetail({ navigation, route }) {
   const handleAddToCart = () => {
     if (!item) return;
     addToCart(item);
-    Alert.alert("เพิ่มในตะกร้าแล้ว", "ดูสินค้าในตะกร้าได้ทันที");
+    Alert.alert("Added to cart", "You can review it in your cart.");
     navigation.navigate("MainDrawer", { screen: "Cart" });
   };
 
   const openBuySheet = () => {
     if (!hasStock) {
-      Alert.alert("สินค้าหมด", "ขออภัย สินค้าหมดชั่วคราว");
+      Alert.alert("Out of stock", "Sorry, this item is currently unavailable.");
       return;
     }
     setPurchaseQuantity("1");
@@ -156,17 +156,17 @@ export default function ProductDetail({ navigation, route }) {
   const handleProceedToCheckout = () => {
     if (!item) return;
     if (!isPurchaseQuantityValid) {
-      Alert.alert("จำนวนไม่ถูกต้อง", "กรุณาเลือกจำนวนสินค้าให้ถูกต้อง");
+      Alert.alert("Invalid quantity", "Please select a valid quantity.");
       return;
     }
     if (isProfileComplete === false) {
       closeBuySheet();
       Alert.alert(
-        "ข้อมูลโปรไฟล์ไม่ครบ",
-        "กรุณาเพิ่มเบอร์โทรศัพท์และที่อยู่ก่อนทำการสั่งซื้อ",
+        "Profile information required",
+        "Please add your phone number and address before placing an order.",
         [
-          { text: "เปิดการตั้งค่า", onPress: navigateToProfile },
-          { text: "ปิด", style: "cancel" },
+          { text: "Open profile", onPress: navigateToProfile },
+          { text: "Cancel", style: "cancel" },
         ]
       );
       return;
@@ -215,13 +215,13 @@ export default function ProductDetail({ navigation, route }) {
                 !hasStock && styles.stockInfoOut,
               ]}
             >
-              {hasStock ? `เหลือ ${quantityDisplay} ชิ้น` : "สินค้าหมด"}
+              {hasStock ? `${quantityDisplay} in stock` : "Out of stock"}
             </Text>
           </View>
 
           {description ? (
             <View style={styles.descriptionSection}>
-              <Text style={styles.sectionLabel}>รายละเอียดสินค้า</Text>
+              <Text style={styles.sectionLabel}>Product details</Text>
               <Text style={styles.detail}>{description}</Text>
             </View>
           ) : null}
@@ -267,12 +267,14 @@ export default function ProductDetail({ navigation, route }) {
                 <Text style={styles.modalPrice}>
                   {price !== undefined && price !== null ? `฿ ${price}` : "-"}
                 </Text>
-                <Text style={styles.modalStock}>คงเหลือ {availableQuantity} ชิ้น</Text>
+                <Text style={styles.modalStock}>
+                  {availableQuantity} in stock
+                </Text>
               </View>
             </View>
 
             <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>จำนวน</Text>
+              <Text style={styles.modalLabel}>Quantity</Text>
               <View style={styles.quantityControl}>
                 <TouchableOpacity
                   style={[

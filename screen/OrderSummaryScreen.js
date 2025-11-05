@@ -13,11 +13,21 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebase/firebaseConfig";
-import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const PRIMARY_BLUE = "#0C7FDA";
 const BACKGROUND = "#f1f3f6";
 const CARD_BG = "#ffffff";
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  "https://stroboscopic-brambly-aniyah.ngrok-free.dev";
 
 export default function OrderSummaryScreen({ navigation, route }) {
   const singleItem = route.params?.item;
@@ -60,6 +70,35 @@ export default function OrderSummaryScreen({ navigation, route }) {
   const [loadingAddress, setLoadingAddress] = useState(true);
   const [creatingOrder, setCreatingOrder] = useState(false);
 
+  const createPaymentIntentOnServer = async (userId, orderId) => {
+    const url = `${API_BASE_URL}/create-payment-intent`;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId, orderId }),
+      });
+      if (!response.ok) {
+        let message = "Unable to create payment intent.";
+        try {
+          const payload = await response.json();
+          if (payload?.error) {
+            message = payload.error;
+          }
+        } catch (error) {
+          // ignore parse error
+        }
+        throw new Error(message);
+      }
+      return await response.json();
+    } catch (error) {
+      console.log("createPaymentIntent error:", error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) {
@@ -95,7 +134,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
 
   const addressText = useMemo(() => {
     if (!address) {
-      return "ยังไม่มีข้อมูลที่อยู่";
+      return "No address on file";
     }
     const detail = address.detail ? address.detail.trim() : "";
     const areaParts = [
@@ -139,7 +178,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
     try {
       setCreatingOrder(true);
       const ordersRef = collection(db, "users", user.uid, "orders");
-      const orderDoc = await addDoc(ordersRef, {
+      const orderDocRef = await addDoc(ordersRef, {
         status: "pending",
         totalPrice,
         createdAt: serverTimestamp(),
@@ -153,13 +192,21 @@ export default function OrderSummaryScreen({ navigation, route }) {
           ownerId: line.item?.ownerId || "",
         })),
       });
+      try {
+        await createPaymentIntentOnServer(user.uid, orderDocRef.id);
+      } catch (error) {
+        await deleteDoc(orderDocRef);
+        throw error;
+      }
       navigation.replace("Payment", {
-        orderId: orderDoc.id,
-        totalPrice,
+        orderId: orderDocRef.id,
       });
     } catch (error) {
       console.log("Order creation error:", error);
-      Alert.alert("ไม่สามารถสร้างคำสั่งซื้อ", "กรุณาลองใหม่อีกครั้ง");
+      Alert.alert(
+        "Unable to create order",
+        error?.message || "Please try again."
+      );
     } finally {
       setCreatingOrder(false);
     }
@@ -175,7 +222,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
         >
           <Ionicons name="arrow-back" size={22} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ทำการสั่งซื้อ</Text>
+        <Text style={styles.headerTitle}>Checkout</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -183,7 +230,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
         <View style={styles.card}>
           <View style={styles.cardRow}>
             <Ionicons name="location-outline" size={20} color={PRIMARY_BLUE} />
-            <Text style={styles.cardTitle}>ที่อยู่จัดส่ง</Text>
+            <Text style={styles.cardTitle}>Shipping address</Text>
           </View>
           {loadingAddress ? (
             <ActivityIndicator size="small" color={PRIMARY_BLUE} />
@@ -200,7 +247,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
               color={PRIMARY_BLUE}
               style={{ marginBottom: 6 }}
             />
-            <Text style={styles.emptyCardText}>ยังไม่ได้เลือกสินค้า</Text>
+            <Text style={styles.emptyCardText}>No items selected</Text>
           </View>
         ) : (
           orderItems.map((line, index) => {
@@ -234,7 +281,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
                   )}
                   <View style={styles.productInfo}>
                     <Text style={styles.productName} numberOfLines={2}>
-                      {product?.name || "สินค้า"}
+                      {product?.name || "Unnamed item"}
                     </Text>
                     <Text style={styles.productPrice}>
                       {formattedLinePrice}
@@ -249,7 +296,7 @@ export default function OrderSummaryScreen({ navigation, route }) {
       </ScrollView>
 
       <View style={styles.summaryBar}>
-        <Text style={styles.summaryText}>รวมยอดสั่งซื้อ {formattedTotal}</Text>
+        <Text style={styles.summaryText}>Total {formattedTotal}</Text>
         <TouchableOpacity
           style={[
             styles.summaryButton,

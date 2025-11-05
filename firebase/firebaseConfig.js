@@ -16,15 +16,15 @@ const firebaseConfig = {
   measurementId: "G-1FVF8BVME4"
 };
 
-// ป้องกัน init ซ้ำตอน reload
+// Ensure init runs only once on reload
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// ใช้ initializeAuth แบบเดียว (ไม่มี getAuth ตรงไหนเลย)
+// Use initializeAuth explicitly (avoid getAuth cache issues)
 const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });
 
-// ใช้ Firestore แบบ long-polling เพื่อกันค้าง
+// Force Firestore to use long polling in this environment
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
   useFetchStreams: false,

@@ -86,12 +86,12 @@ export default function RegisterScreen({ navigation }) {
     const trimmedConfirm = confirmPassword.trim();
 
     if (!trimmedUsername || !trimmedEmail || !trimmedPassword || !trimmedConfirm) {
-      Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกทุกช่องให้ครบถ้วน");
+      Alert.alert("Missing information", "Please complete every field.");
       return;
     }
 
     if (trimmedPassword !== trimmedConfirm) {
-      Alert.alert("รหัสผ่านไม่ตรงกัน", "กรุณายืนยันรหัสผ่านให้ตรงกับรหัสผ่านหลัก");
+      Alert.alert("Passwords do not match", "Please confirm your password.");
       return;
     }
 
@@ -107,7 +107,7 @@ export default function RegisterScreen({ navigation }) {
       );
 
       if (!existing.empty) {
-        Alert.alert("ชื่อผู้ใช้ซ้ำ", "กรุณาเลือกชื่อผู้ใช้อื่น");
+        Alert.alert("Username already taken", "Please choose another username.");
         return;
       }
 
@@ -126,11 +126,11 @@ export default function RegisterScreen({ navigation }) {
         role,
       });
 
-      Alert.alert("สำเร็จ", "สมัครสมาชิกเรียบร้อย");
+      Alert.alert("Success", "Registration completed.");
       navigation.replace("Login");
     } catch (err) {
       console.log("Register error:", err);
-      Alert.alert("สมัครไม่สำเร็จ", err?.message ?? "เกิดข้อผิดพลาด");
+      Alert.alert("Registration failed", err?.message ?? "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }

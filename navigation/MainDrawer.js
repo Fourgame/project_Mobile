@@ -7,7 +7,7 @@ import {
   StatusBar,
   Text,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons"; // ✅ ใช้แบบ named import เดียวกัน
+import { Ionicons } from "@expo/vector-icons"; 
 import { signOut } from "firebase/auth";
 import {
   createDrawerNavigator,

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -6,31 +6,19 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
-  Alert,
   ScrollView,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import QRCode from "react-native-qrcode-svg";
-import promptpay from "promptpay-qr";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { auth, db } from "../firebase/firebaseConfig";
-import {
-  doc,
-  onSnapshot,
-  runTransaction,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
-
-const PROMPTPAY_ID = "0935493541";
+import { doc, onSnapshot } from "firebase/firestore";
 
 export default function PaymentScreen({ navigation, route }) {
   const orderId = route.params?.orderId;
-  const initialTotal = Number(route.params?.totalPrice) || 0;
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,70 +52,26 @@ export default function PaymentScreen({ navigation, route }) {
     }, [navigation, orderId])
   );
 
-  const totalPrice = Number(order?.totalPrice ?? initialTotal) || 0;
+  const totalPrice = Number(order?.totalPrice || 0);
   const formattedTotal = `฿ ${totalPrice.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
-
-  const qrPayload = useMemo(() => {
-    const amount = Number(totalPrice.toFixed(2));
-    if (!amount || amount <= 0) {
-      return promptpay(PROMPTPAY_ID);
-    }
-    return promptpay(PROMPTPAY_ID, { amount });
-  }, [totalPrice]);
+  const qrImageData = order?.paymentQr?.data || null;
+  const qrImageUrl = order?.paymentQr?.imageUrl || null;
+  const qrImageUri =
+    qrImageUrl ||
+    (qrImageData
+      ? `data:image/${order.paymentQr.imageType || "png"};base64,${order.paymentQr.data}`
+      : null);
+  const qrExpiresAt = order?.paymentQr?.expiresAt
+    ? new Date(order.paymentQr.expiresAt * 1000)
+    : null;
+  const status = order?.status || "pending";
+  const items = Array.isArray(order?.items) ? order.items : [];
 
   const handleBack = () => {
     navigation.navigate("MainDrawer", { screen: "List" });
-  };
-
-  const handleConfirmPayment = async () => {
-    if (!order || updating) return;
-    const user = auth.currentUser;
-    if (!user) {
-      navigation.replace("Login");
-      return;
-    }
-    try {
-      setUpdating(true);
-      const items = order.items || [];
-      for (const item of items) {
-        const ownerId = item?.ownerId;
-        const category = item?.category;
-        const productId = item?.productId;
-        const quantity = Number(item?.quantity) || 0;
-        if (!ownerId || !category || !productId || quantity <= 0) {
-          continue;
-        }
-        const productRef = doc(db, "users", ownerId, category, productId);
-        await runTransaction(db, async (transaction) => {
-          const productSnap = await transaction.get(productRef);
-          if (!productSnap.exists()) {
-            return;
-          }
-          const currentQty = Number(productSnap.data()?.quantity) || 0;
-          const newQty = Math.max(0, currentQty - quantity);
-          transaction.update(productRef, { quantity: newQty });
-        });
-      }
-      const orderRef = doc(db, "users", user.uid, "orders", order.id);
-      await updateDoc(orderRef, {
-        status: "paid",
-        paidAt: serverTimestamp(),
-      });
-      Alert.alert("สำเร็จ", "ยืนยันการชำระเงินเรียบร้อยแล้ว", [
-        {
-          text: "ตกลง",
-          onPress: () => navigation.navigate("MainDrawer", { screen: "List" }),
-        },
-      ]);
-    } catch (error) {
-      console.log("Confirm payment error:", error);
-      Alert.alert("เกิดข้อผิดพลาด", "ไม่สามารถยืนยันการชำระเงินได้ กรุณาลองใหม่");
-    } finally {
-      setUpdating(false);
-    }
   };
 
   if (loading) {
@@ -147,17 +91,28 @@ export default function PaymentScreen({ navigation, route }) {
         <StatusBar backgroundColor="#04162A" barStyle="light-content" />
         <View style={styles.emptyState}>
           <Ionicons name="alert-circle-outline" size={42} color="#9FB2D3" />
-          <Text style={styles.emptyText}>ไม่พบคำสั่งซื้อ</Text>
+          <Text style={styles.emptyText}>Order not found</Text>
           <TouchableOpacity style={styles.backButtonGhost} onPress={handleBack}>
-            <Text style={styles.backGhostText}>กลับไปหน้ารายการ</Text>
+            <Text style={styles.backGhostText}>Back to list</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  const isPending = order.status === "pending";
-  const items = Array.isArray(order.items) ? order.items : [];
+  const isPending = status === "pending";
+  const isPaid = status === "paid";
+  const isFailed = status === "failed";
+  const statusLabel = isPaid
+    ? "Payment completed"
+    : isFailed
+    ? "Payment failed"
+    : "Awaiting payment";
+  const statusStyle = isPaid
+    ? styles.statusPaid
+    : isFailed
+    ? styles.statusFailed
+    : styles.statusPending;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -166,47 +121,76 @@ export default function PaymentScreen({ navigation, route }) {
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ชำระเงิน</Text>
+        <Text style={styles.headerTitle}>Payment</Text>
         <View style={{ width: 32 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>สถานะ:</Text>
-            <View
-              style={[
-                styles.statusBadge,
-                isPending ? styles.statusPending : styles.statusPaid,
-              ]}
-            >
-              <Text style={styles.statusText}>
-                {isPending ? "รอดำเนินการชำระเงิน" : "ชำระเงินแล้ว"}
-              </Text>
+            <Text style={styles.statusLabel}>Status:</Text>
+            <View style={[styles.statusBadge, statusStyle]}>
+              <Text style={styles.statusText}>{statusLabel}</Text>
             </View>
           </View>
 
-          <Text style={styles.amountLabel}>ยอดชำระ</Text>
+          <Text style={styles.amountLabel}>Amount due</Text>
           <Text style={styles.amountValue}>{formattedTotal}</Text>
 
-          <View style={styles.qrWrapper}>
-            <QRCode value={qrPayload} size={220} backgroundColor="#0A1D33" />
-          </View>
-          <Text style={styles.promptpayText}>PromptPay: {PROMPTPAY_ID}</Text>
-          <Text style={styles.orderId}>หมายเลขคำสั่งซื้อ: {order.id}</Text>
+          {isPending ? (
+            <>
+              <View style={styles.qrWrapper}>
+                {qrImageUri ? (
+                  <Image
+                    source={{ uri: qrImageUri }}
+                    style={styles.qrImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View style={styles.qrPlaceholder}>
+                    <ActivityIndicator size="large" color="#0C7FDA" />
+                    <Text style={styles.qrPlaceholderText}>
+                      Generating QR code...
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {qrExpiresAt ? (
+                <Text style={styles.promptpayText}>
+                  QR expires at:{" "}
+                  {qrExpiresAt.toLocaleString("th-TH", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <View style={styles.illustrationWrapper}>
+              <Ionicons
+                name={isPaid ? "checkmark-circle" : "alert-circle"}
+                size={120}
+                color={isPaid ? "#2EC27E" : "#FF6B6B"}
+              />
+              <Text style={styles.illustrationText}>
+                {isPaid
+                  ? "Your order has been paid successfully."
+                  : "We could not confirm the payment. Please try again."}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.orderId}>Order number: {order.id}</Text>
         </View>
 
         <View style={styles.itemsCard}>
-          <Text style={styles.itemsTitle}>รายการสินค้า</Text>
+          <Text style={styles.itemsTitle}>Items</Text>
           {items.map((item, index) => (
             <View key={`${order.id}_item_${index}`} style={styles.itemRow}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={styles.itemName} numberOfLines={1}>
-                  {item.name || "สินค้า"}
+                  {item.name || "Unnamed item"}
                 </Text>
-                <Text style={styles.itemMeta}>
-                  จำนวน {item.quantity} ชิ้น
-                </Text>
+                <Text style={styles.itemMeta}>Qty {item.quantity}</Text>
               </View>
               <Text style={styles.itemPrice}>
                 ฿{" "}
@@ -219,29 +203,36 @@ export default function PaymentScreen({ navigation, route }) {
           ))}
         </View>
 
-        <View style={styles.instructions}>
-          <Text style={styles.instructionsTitle}>ขั้นตอนการชำระเงิน</Text>
-          <Text style={styles.instructionsText}>
-            1. เปิดแอปธนาคารที่รองรับการสแกน QR Code{"\n"}
-            2. สแกนคิวอาร์ข้างต้น และตรวจสอบยอดก่อนยืนยัน{"\n"}
-            3. หลังชำระเงิน กดปุ่มยืนยันการชำระเงินด้านล่างเพื่ออัปเดตสถานะ
-          </Text>
-        </View>
-
         {isPending ? (
-          <TouchableOpacity
-            style={[
-              styles.confirmButton,
-              updating && { opacity: 0.7 },
-            ]}
-            onPress={handleConfirmPayment}
-            disabled={updating}
-          >
-            <Text style={styles.confirmButtonText}>
-              {updating ? "กำลังยืนยัน..." : "ยืนยันการชำระเงิน"}
+          <View style={styles.instructions}>
+            <Text style={styles.instructionsTitle}>How to pay</Text>
+            <Text style={styles.instructionsText}>
+              1. Open your banking app that supports PromptPay QR codes.{"\n"}
+              2. Scan the QR code above and verify the amount before confirming.{"\n"}
+              3. Once the payment is completed, the status will update automatically after Stripe confirms it.
             </Text>
-          </TouchableOpacity>
+          </View>
         ) : (
+          <View style={styles.instructions}>
+            <Text style={styles.instructionsTitle}>Order status</Text>
+            <Text style={styles.instructionsText}>
+              {isPaid
+                ? "Payment has been received. We are preparing your order."
+                : "Payment has not been confirmed. If you have already been charged, please contact support."}
+            </Text>
+          </View>
+        )}
+
+        {isPending && (
+          <View style={styles.waitingNotice}>
+            <ActivityIndicator size="small" color="#F5A623" />
+            <Text style={styles.waitingText}>
+              Waiting for payment confirmation...
+            </Text>
+          </View>
+        )}
+
+        {isPaid && (
           <View style={styles.paidNotice}>
             <Ionicons
               name="checkmark-circle-outline"
@@ -249,7 +240,16 @@ export default function PaymentScreen({ navigation, route }) {
               color="#2EC27E"
             />
             <Text style={styles.paidNoticeText}>
-              สถานะคำสั่งซื้อได้รับการอัปเดตแล้ว
+              Payment confirmed. Thank you!
+            </Text>
+          </View>
+        )}
+
+        {isFailed && (
+          <View style={styles.failedNotice}>
+            <Ionicons name="alert-circle" size={22} color="#FF6B6B" />
+            <Text style={styles.failedNoticeText}>
+              Payment failed. Please try again.
             </Text>
           </View>
         )}
@@ -262,6 +262,21 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#04162A",
+  },
+  illustrationWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    width: 220,
+    height: 220,
+    borderRadius: 20,
+    backgroundColor: "rgba(46, 194, 126, 0.08)",
+  },
+  illustrationText: {
+    color: "#E6EEFF",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
   loader: {
     flex: 1,
@@ -348,6 +363,9 @@ const styles = StyleSheet.create({
   statusPaid: {
     backgroundColor: "#2EC27E",
   },
+  statusFailed: {
+    backgroundColor: "#FF6B6B",
+  },
   statusText: {
     color: "#fff",
     fontSize: 12,
@@ -366,6 +384,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 12,
     borderRadius: 20,
+  },
+  qrImage: {
+    width: 220,
+    height: 220,
+  },
+  qrPlaceholder: {
+    width: 220,
+    height: 220,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  qrPlaceholderText: {
+    color: "#0C7FDA",
+    fontSize: 14,
   },
   promptpayText: {
     color: "#B2C4E4",
@@ -411,7 +444,7 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#0C223B",
     borderRadius: 20,
-    padding: 20,
+    padding: 10,
     gap: 10,
   },
   instructionsTitle: {
@@ -424,17 +457,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
-  confirmButton: {
-    width: "100%",
-    backgroundColor: "#F64F4F",
-    borderRadius: 24,
-    paddingVertical: 16,
+  waitingNotice: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 12,
   },
-  confirmButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
+  waitingText: {
+    color: "#F5A623",
+    fontSize: 14,
+    fontWeight: "600",
   },
   paidNotice: {
     flexDirection: "row",
@@ -445,6 +478,18 @@ const styles = StyleSheet.create({
   },
   paidNoticeText: {
     color: "#9BE3C1",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  failedNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+  failedNoticeText: {
+    color: "#FF9B9B",
     fontSize: 14,
     fontWeight: "600",
   },

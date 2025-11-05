@@ -548,7 +548,7 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={handleSignOut}>
-            <Text style={styles.secondaryButtonText}>Sign out</Text>
+            <Text style={styles.secondaryButtonText}>Log out</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -640,13 +640,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   readonlyBox: {
-    backgroundColor: INPUT_BG,
+    backgroundColor: "#eff2f7",
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#d6dbe5",
   },
   readonlyText: {
-    color: "#333",
+    color: "#6c7280",
     fontSize: 15,
   },
   textInput: {
@@ -723,13 +725,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#cbd2da",
+    backgroundColor: "#d95050",
   },
   secondaryButtonText: {
-    color: "#333",
+    color: "#fff",
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   modalBackdrop: {
     flex: 1,

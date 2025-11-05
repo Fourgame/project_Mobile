@@ -128,7 +128,7 @@ export default function CartScreen({ navigation }) {
 
   const handlePayment = () => {
     if (paymentDisabled) {
-      Alert.alert("ยังไม่ได้เลือกสินค้า", "กรุณาเลือกสินค้าที่ต้องการชำระ");
+      Alert.alert("No items selected", "Please choose at least one item to pay for.");
       return;
     }
 
@@ -149,7 +149,7 @@ export default function CartScreen({ navigation }) {
       .filter(Boolean);
 
     if (payloadItems.length === 0) {
-      Alert.alert("จำนวนสินค้าไม่ถูกต้อง", "กรุณาตรวจสอบจำนวนสินค้าก่อนชำระ");
+      Alert.alert("Invalid quantity", "Please review the selected quantities before paying.");
       return;
     }
 
@@ -183,7 +183,7 @@ export default function CartScreen({ navigation }) {
             {cartItems.map((item) => {
               const stock = getStockForItem(item);
               const remainingText =
-                stock === null ? "คงเหลือ - ชิ้น" : `คงเหลือ ${stock} ชิ้น`;
+                stock === null ? "Stock: -" : `Stock: ${stock}`;
               const quantity =
                 Number.isFinite(item.cartQuantity) && item.cartQuantity >= 0
                   ? item.cartQuantity

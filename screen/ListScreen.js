@@ -23,12 +23,15 @@ const STATUS_COLOR = {
   pending: "#F5A623",
   paid: "#2EC27E",
   canceled: "#FF4C4C",
+  failed: "#FF4C4C",
+  default: "#3E4A5A",
 };
 
 const STATUS_LABEL = {
-  pending: "รอดำเนินการชำระเงิน",
-  paid: "ชำระเงินแล้ว",
-  canceled: "ยกเลิก",
+  pending: "Awaiting payment",
+  paid: "Paid",
+  canceled: "Cancelled",
+  failed: "Payment failed",
 };
 
 export default function ListScreen({ navigation }) {
@@ -86,8 +89,12 @@ export default function ListScreen({ navigation }) {
   };
 
   const renderStatus = (status = "pending") => {
-    const label = STATUS_LABEL[status] || "รอดำเนินการชำระเงิน";
-    const color = STATUS_COLOR[status] || STATUS_COLOR.pending;
+    const label = STATUS_LABEL[status] || "Awaiting payment";
+    const color =
+      STATUS_COLOR[status] ||
+      (status === "pending"
+        ? STATUS_COLOR.pending
+        : STATUS_COLOR.default);
     return (
       <View style={[styles.statusBadge, { backgroundColor: color }]}>
         <Text style={styles.statusText}>{label}</Text>
@@ -103,7 +110,7 @@ export default function ListScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <Text style={styles.title}>คำสั่งซื้อของฉัน</Text>
+        <Text style={styles.title}>My Orders</Text>
         {loading ? (
           <View style={styles.loader}>
             <ActivityIndicator size="large" color="#0C7FDA" />
@@ -111,7 +118,7 @@ export default function ListScreen({ navigation }) {
         ) : orders.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={42} color="#748AAD" />
-            <Text style={styles.emptyText}>ยังไม่มีคำสั่งซื้อ</Text>
+            <Text style={styles.emptyText}>No orders yet</Text>
           </View>
         ) : (
           orders.map((order) => {
@@ -126,7 +133,11 @@ export default function ListScreen({ navigation }) {
             return (
               <TouchableOpacity
                 key={order.id}
-                style={styles.orderCard}
+                style={[
+                  styles.orderCard,
+                  order.status === "paid" && styles.orderCardPaid,
+                  order.status === "failed" && styles.orderCardFailed,
+                ]}
                 activeOpacity={0.85}
                 onPress={() =>
                   navigation.navigate("Payment", {
@@ -144,7 +155,7 @@ export default function ListScreen({ navigation }) {
                   {(order.items || []).map((item, idx) => (
                     <View key={`${order.id}_item_${idx}`} style={styles.itemRow}>
                       <Text style={styles.itemName} numberOfLines={1}>
-                        {item.name || "สินค้า"}
+                        {item.name || "Unnamed item"}
                       </Text>
                       <Text style={styles.itemQty}>
                         x {item.quantity} · ฿{" "}
@@ -157,7 +168,7 @@ export default function ListScreen({ navigation }) {
                   ))}
                 </View>
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>ยอดรวม</Text>
+                  <Text style={styles.totalLabel}>Total</Text>
                   <Text style={styles.totalValue}>
                     ฿{" "}
                     {total.toLocaleString("en-US", {
@@ -178,11 +189,13 @@ export default function ListScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f5f7fa",
   },
   content: {
-    padding: 20,
-    gap: 16,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 20,
+    gap: 12,
   },
   title: {
     fontSize: 22,
@@ -203,15 +216,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   orderCard: {
-    backgroundColor: "rgba(95, 115, 138, 0.85)",
-    borderRadius: 16,
-    padding: 16,
-    gap: 10,
+    backgroundColor: "rgba(28, 44, 64, 0.95)",
+    borderRadius: 18,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  orderCardPaid: {
+    borderColor: "rgba(46, 194, 126, 0.4)",
+    backgroundColor: "rgba(17, 41, 34, 0.9)",
+  },
+  orderCardFailed: {
+    borderColor: "rgba(255, 80, 80, 0.35)",
+    backgroundColor: "rgba(52, 22, 24, 0.9)",
   },
   orderHeader: {
     flexDirection: "row",
@@ -219,7 +242,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   orderId: {
-    color: "#fff",
+    color: "#F8FAFF",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -263,11 +286,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   totalLabel: {
-    color: "#9FB2D3",
+    color: "#AABAD4",
     fontSize: 14,
   },
   totalValue: {
-    color: "#fff",
+    color: "#F1F4FA",
     fontSize: 16,
     fontWeight: "700",
   },

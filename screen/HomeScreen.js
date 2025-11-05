@@ -124,7 +124,7 @@ export default function HomeScreen({ navigation }) {
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert("ต้องการสิทธิ์", "กรุณาอนุญาตการเข้าถึงรูปภาพ");
+        Alert.alert("Permission required", "Please allow photo library access.");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -136,7 +136,7 @@ export default function HomeScreen({ navigation }) {
       }
     } catch (error) {
       console.log("Edit image pick error:", error);
-      Alert.alert("ไม่สามารถเลือกรูปได้", "กรุณาลองอีกครั้ง");
+      Alert.alert("Unable to select image", "Please try again.");
     }
   };
 
@@ -172,16 +172,20 @@ export default function HomeScreen({ navigation }) {
     const trimmedName = editName.trim();
     const trimmedDetail = editDetail.trim();
     if (!trimmedName) {
-      Alert.alert("ข้อมูลไม่ครบ", "กรุณากรอกชื่อสินค้า");
+      Alert.alert("Missing information", "Please enter the product name.");
       return;
     }
     const numericPrice = Number(editPrice);
     if (!editPrice || Number.isNaN(numericPrice)) {
-      Alert.alert("ราคาผิดพลาด", "กรุณากรอกตัวเลขสำหรับราคา");
+      Alert.alert("Invalid price", "Please enter a numeric price.");
+      return;
+    }
+    if (numericPrice < 10) {
+      Alert.alert("Invalid price", "Minimum price is 10 baht.");
       return;
     }
     if (editQuantity === "") {
-      Alert.alert("จำนวนไม่ถูกต้อง", "กรุณากรอกจำนวนสินค้า");
+      Alert.alert("Invalid quantity", "Please enter the quantity.");
       return;
     }
     const numericQuantity = Number(editQuantity);
@@ -190,7 +194,7 @@ export default function HomeScreen({ navigation }) {
       numericQuantity < 0 ||
       numericQuantity > 100
     ) {
-      Alert.alert("จำนวนไม่ถูกต้อง", "กรุณากรอกตัวเลข 0 ถึง 100");
+      Alert.alert("Invalid quantity", "Please enter a number between 0 and 100.");
       return;
     }
 
@@ -202,7 +206,7 @@ export default function HomeScreen({ navigation }) {
       if (editImageAsset?.uri) {
         const uploaded = await uploadToCloudinary(editImageAsset);
         if (!uploaded?.url) {
-          throw new Error("ไม่สามารถอัปโหลดรูปภาพได้");
+          throw new Error("Unable to upload image.");
         }
         pictureUrl = uploaded.url;
         if (editingItem.publicId && editingItem.publicId !== uploaded.publicId) {
@@ -227,10 +231,10 @@ export default function HomeScreen({ navigation }) {
         publicId,
       });
       closeEditModal(true);
-      Alert.alert("สำเร็จ", "อัปเดตรายการเรียบร้อย");
+      Alert.alert("Success", "Item updated successfully.");
     } catch (error) {
       console.log("Edit item error:", error);
-      Alert.alert("อัปเดตไม่สำเร็จ", "กรุณาลองอีกครั้ง");
+      Alert.alert("Update failed", "Please try again.");
     } finally {
       setEditSubmitting(false);
     }
@@ -395,7 +399,21 @@ export default function HomeScreen({ navigation }) {
               const entries = itemsByCategory[category.key] ?? [];
               return (
                 <View key={category.key} style={styles.categorySection}>
-                  <Text style={styles.categoryTitle}>{category.label}</Text>
+                  <View style={styles.categoryHeader}>
+                    <Text style={styles.categoryTitle}>{category.label}</Text>
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate("CategoryItems", {
+                          categoryKey: category.key,
+                          categoryLabel: category.label,
+                          items: entries,
+                        })
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.viewAllText}>View all</Text>
+                    </TouchableOpacity>
+                  </View>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.horizontalList}>
                     {entries.length === 0 ? (
@@ -564,8 +582,10 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.editLabel}>Price</Text>
                 <TextInput
                   style={styles.editInput}
-                  value={editPrice}
-                  onChangeText={setEditPrice}
+          value={editPrice}
+          onChangeText={(value) =>
+            setEditPrice(value.replace(/[^0-9.]/g, ""))
+          }
                   placeholder="Enter price"
                   keyboardType="numeric"
                   editable={!editSubmitting}
@@ -628,11 +648,21 @@ const styles = StyleSheet.create({
   categorySection: {
     marginBottom: 24,
   },
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   categoryTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#000000ff",
-    marginBottom: 12,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0C7FDA",
   },
   horizontalList: {
     flexDirection: "row",
