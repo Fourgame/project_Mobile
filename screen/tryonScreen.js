@@ -149,22 +149,42 @@ export default function TryOnScreen({ navigation, route }) {
   const downloadEnabled = !!resultImage;
   const canProceedToPayment = productImages.length > 0;
 
-  const pickPersonImage = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      quality: 1,
-    });
-    if (!res.canceled) {
-      setPersonImage(res.assets[0].uri);
+const requestMediaPermission = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (permission.status !== "granted") {
+    Alert.alert(
+      "Permission required",
+      "Please allow photo library access to continue."
+    );
+    return false;
+  }
+  return true;
+};
+
+const pickPersonImage = async () => {
+  const allowed = await requestMediaPermission();
+  if (!allowed) {
+    return;
+  }
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaType.Images,
+    quality: 1,
+  });
+  if (!res.canceled) {
+    setPersonImage(res.assets[0].uri);
       setResultImage(null);
     }
   };
 
-  const addProductImage = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      quality: 1,
-    });
+const addProductImage = async () => {
+  const allowed = await requestMediaPermission();
+  if (!allowed) {
+    return;
+  }
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaType.Images,
+    quality: 1,
+  });
     if (!res.canceled) {
       const uri = res.assets[0].uri;
       setProductImages((prev) => [
@@ -181,11 +201,15 @@ export default function TryOnScreen({ navigation, route }) {
     }
   };
 
-  const updateProductImage = async (index) => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      quality: 1,
-    });
+const updateProductImage = async (index) => {
+  const allowed = await requestMediaPermission();
+  if (!allowed) {
+    return;
+  }
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaType.Images,
+    quality: 1,
+  });
     if (!res.canceled) {
       const uri = res.assets[0].uri;
       setProductImages((prev) =>
@@ -322,13 +346,27 @@ export default function TryOnScreen({ navigation, route }) {
     }
   };
 
-  const handleProceedToPayment = () => {
-    navigation.navigate("Payment", {
-      source: "TryOn",
-      totalAmount: totalPrice,
-      items: productImages,
-    });
-  };
+const handleProceedToCheckout = () => {
+  if (!canProceedToPayment) return;
+  const itemsPayload = productImages
+    .filter((item) => item?.uri)
+    .map((item) => ({
+      item: {
+        id: item.id,
+        name: item.name || "Unnamed item",
+        price: Number.isFinite(Number(item.price)) ? Number(item.price) : 0,
+        picture: item.uri || "",
+      },
+      quantity: 1,
+    }));
+
+  const parentNav = navigation.getParent?.();
+  if (parentNav) {
+    parentNav.navigate("OrderSummary", { items: itemsPayload });
+  } else {
+    navigation.navigate("OrderSummary", { items: itemsPayload });
+  }
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -545,11 +583,11 @@ export default function TryOnScreen({ navigation, route }) {
                 styles.paymentButton,
                 !canProceedToPayment && styles.paymentButtonDisabled,
               ]}
-              onPress={handleProceedToPayment}
+              onPress={handleProceedToCheckout}
               disabled={!canProceedToPayment}
             >
               <Text style={styles.paymentButtonText}>
-                Payment ({Math.max(productImages.length, 1)})
+                Checkout ({Math.max(productImages.length, 1)})
               </Text>
             </TouchableOpacity>
           </View>
