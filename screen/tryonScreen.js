@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -84,7 +84,7 @@ const formatPrice = (value) => {
   if (value === null || value === undefined) return null;
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
-  return `฿ ${numeric.toLocaleString("en-US", {
+  return `THB ${numeric.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -170,6 +170,12 @@ export default function TryOnScreen({ navigation, route }) {
   const initialProductItemsParam = route?.params?.productItems ?? [];
   const productName = route?.params?.productName ?? "";
   const productPrice = route?.params?.productPrice ?? null;
+  const historyOnly = route?.params?.historyOnly === true;
+  const initialTab = historyOnly
+    ? "history"
+    : route?.params?.initialTab === "history"
+    ? "history"
+    : "try";
 
   const [personImage, setPersonImage] = useState(null);
   const [productImages, setProductImages] = useState(() =>
@@ -183,7 +189,7 @@ export default function TryOnScreen({ navigation, route }) {
   );
   const [resultImage, setResultImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("try");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [uploadingResult, setUploadingResult] = useState(false);
@@ -202,6 +208,12 @@ export default function TryOnScreen({ navigation, route }) {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (historyOnly || route?.params?.initialTab === "history") {
+      setActiveTab("history");
+    }
+  }, [historyOnly, route?.params?.initialTab]);
 
   const hasAnyProductImage = useMemo(
     () => productImages.some((item) => !!item?.uri),
@@ -250,67 +262,10 @@ export default function TryOnScreen({ navigation, route }) {
       setResultImage(null);
       setResultCloudinaryUrl(null);
       setUploadingResult(false);
-      setActiveTab("try");
-    }
-  };
-
-  const requestMediaSavePermission = async () => {
-    const current = await MediaLibrary.getPermissionsAsync(true, ["photo"]);
-    if (current.granted) {
-      return true;
-    }
-
-    const requested = await MediaLibrary.requestPermissionsAsync(true, [
-      "photo",
-    ]);
-
-    if (!requested.granted) {
-      Alert.alert(
-        "Permission required",
-        "Please allow access to save images to your gallery."
-      );
-      return false;
-    }
-
-    if (requested.accessPrivileges === "limited") {
-      Alert.alert(
-        "Limited access",
-        "Grant full photo access to save try-on images.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Open settings",
-            onPress: () => {
-              if (typeof Linking.openSettings === "function") {
-                Linking.openSettings();
-              }
-            },
-          },
-        ]
-      );
-      return false;
-    }
-
-    return true;
-  };
-
-  const getWritableDirectory = () => {
-    const candidates = [
-      FileSystem.cacheDirectory,
-      FileSystem.documentDirectory,
-    ];
-
-    for (const candidate of candidates) {
-      if (
-        typeof candidate === "string" &&
-        candidate.length > 0 &&
-        candidate !== "undefined"
-      ) {
-        return candidate.endsWith("/") ? candidate : `${candidate}/`;
+      if (!historyOnly) {
+        setActiveTab("try");
       }
     }
-
-    return null;
   };
 
   const addProductImage = async () => {
@@ -336,7 +291,9 @@ export default function TryOnScreen({ navigation, route }) {
       setResultImage(null);
       setResultCloudinaryUrl(null);
       setUploadingResult(false);
-      setActiveTab("try");
+      if (!historyOnly) {
+        setActiveTab("try");
+      }
     }
   };
 
@@ -362,7 +319,9 @@ export default function TryOnScreen({ navigation, route }) {
       setResultImage(null);
       setResultCloudinaryUrl(null);
       setUploadingResult(false);
-      setActiveTab("try");
+      if (!historyOnly) {
+        setActiveTab("try");
+      }
     }
   };
   const removeProductImage = (index) => {
@@ -410,7 +369,9 @@ export default function TryOnScreen({ navigation, route }) {
     setResultImage(null);
     setResultCloudinaryUrl(null);
     setUploadingResult(false);
-    setActiveTab("try");
+    if (!historyOnly) {
+      setActiveTab("try");
+    }
 
     try {
       const personResp = await fetch(personImage);
@@ -504,7 +465,7 @@ export default function TryOnScreen({ navigation, route }) {
     }
 
     try {
-      const textToShare = `The link show my Try on👇\n${resultCloudinaryUrl}`;
+      const textToShare = `Check out my try-on result:\n${resultCloudinaryUrl}`;
       await Share.share({
         message: textToShare,
       });
@@ -542,7 +503,7 @@ export default function TryOnScreen({ navigation, route }) {
   const handleShareHistoryItem = async (item) => {
     if (!item?.url) return;
     try {
-      const textToShare = `The link show my Try on👇\n${item.url}`;
+      const textToShare = `Check out this try-on result:\n${item.url}`;
       await Share.share({ message: textToShare });
     } catch (error) {
       Alert.alert("Share failed", error.message || "Unable to share right now.");
@@ -551,11 +512,6 @@ export default function TryOnScreen({ navigation, route }) {
 
   const handleDownloadHistoryItem = async (item) => {
     if (!item?.url) {
-      return;
-    }
-
-    const hasPermission = await requestMediaSavePermission();
-    if (!hasPermission) {
       return;
     }
 
@@ -568,6 +524,10 @@ export default function TryOnScreen({ navigation, route }) {
       );
     }
   };
+
+  const showTabs = !historyOnly;
+  const showTrySection = !historyOnly && activeTab === "try";
+  const showHistorySection = historyOnly || activeTab === "history";
 
   const handleGoToCart = () => {
     const parentNav = navigation.getParent?.();
@@ -603,6 +563,7 @@ export default function TryOnScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
+        {showTabs ? (
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -614,50 +575,53 @@ export default function TryOnScreen({ navigation, route }) {
           <Text style={styles.headerTitle}>Virtual Try-On</Text>
           <View style={styles.headerSpacer} />
         </View>
+        ) : null}
 
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === "try" && styles.tabButtonActive,
-            ]}
-            onPress={() => setActiveTab("try")}
-            activeOpacity={0.85}
-          >
-            <Text
+        {showTabs ? (
+          <View style={styles.tabBar}>
+            <TouchableOpacity
               style={[
-                styles.tabButtonText,
-                activeTab === "try" && styles.tabButtonTextActive,
+                styles.tabButton,
+                activeTab === "try" && styles.tabButtonActive,
               ]}
+              onPress={() => setActiveTab("try")}
+              activeOpacity={0.85}
             >
-              Try On
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === "history" && styles.tabButtonActive,
-            ]}
-            onPress={() => setActiveTab("history")}
-            activeOpacity={0.85}
-          >
-            <Text
+              <Text
+                style={[
+                  styles.tabButtonText,
+                  activeTab === "try" && styles.tabButtonTextActive,
+                ]}
+              >
+                Try On
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[
-                styles.tabButtonText,
-                activeTab === "history" && styles.tabButtonTextActive,
+                styles.tabButton,
+                activeTab === "history" && styles.tabButtonActive,
               ]}
+              onPress={() => setActiveTab("history")}
+              activeOpacity={0.85}
             >
-              History
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text
+                style={[
+                  styles.tabButtonText,
+                  activeTab === "history" && styles.tabButtonTextActive,
+                ]}
+              >
+                History
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          {activeTab === "try" ? (
+          {showTrySection ? (
             <>
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Items to try on</Text>
@@ -819,14 +783,14 @@ export default function TryOnScreen({ navigation, route }) {
                         Share
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.actionButton,
-                        !downloadEnabled && styles.actionButtonDisabled,
-                      ]}
-                      onPress={handleDownloadResult}
-                      disabled={!downloadEnabled}
-                    >
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    !downloadEnabled && styles.actionButtonDisabled,
+                  ]}
+                  onPress={handleDownloadResult}
+                  disabled={!downloadEnabled}
+                >
                       <Ionicons
                         name="download-outline"
                         size={18}
@@ -874,7 +838,9 @@ export default function TryOnScreen({ navigation, route }) {
                 </TouchableOpacity>
               </View>
             </>
-          ) : (
+          ) : null}
+
+          {showHistorySection ? (
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Saved try-on results</Text>
               {historyLoading ? (
@@ -948,7 +914,7 @@ export default function TryOnScreen({ navigation, route }) {
                 </View>
               )}
             </View>
-          )}
+          ) : null}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -1358,4 +1324,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F1FF",
   },
 });
+
 
