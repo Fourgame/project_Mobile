@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+﻿import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,43 +13,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { auth, db } from "../firebase/firebaseConfig";
-import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
-
-const ORDER_EXPIRY_MS = 3 * 60 * 1000;
-
-const getTimestampMillis = (value) => {
-  if (!value) return null;
-  if (typeof value.toMillis === "function") return value.toMillis();
-  if (typeof value.seconds === "number") return value.seconds * 1000;
-  if (typeof value === "number") return value;
-  return null;
-};
-
-const maybeExpireOrder = async (snapshot) => {
-  const data = snapshot.data();
-  const createdMillis = getTimestampMillis(data?.createdAt);
-  if (
-    data?.status === "pending" &&
-    createdMillis &&
-    Date.now() - createdMillis >= ORDER_EXPIRY_MS
-  ) {
-    try {
-      await updateDoc(snapshot.ref, {
-        status: "failed",
-        expiredAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.log("Expire order error:", error);
-    }
-  }
-};
+import { doc, onSnapshot } from "firebase/firestore";
 
 export default function PaymentScreen({ navigation, route }) {
   const orderId = route.params?.orderId;
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [remainingMs, setRemainingMs] = useState(0);
-  const hasExpiredRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -67,9 +36,6 @@ export default function PaymentScreen({ navigation, route }) {
       const unsubscribe = onSnapshot(
         orderRef,
         (snap) => {
-          if (snap.exists()) {
-            maybeExpireOrder(snap);
-          }
           if (!snap.exists()) {
             setOrder(null);
           } else {
@@ -107,53 +73,6 @@ export default function PaymentScreen({ navigation, route }) {
     : null;
   const status = order?.status || "pending";
   const items = Array.isArray(order?.items) ? order.items : [];
-
-  useEffect(() => {
-    let timer;
-    const createdMillis = getTimestampMillis(order?.createdAt);
-    if (status === "pending" && createdMillis) {
-      hasExpiredRef.current = false;
-      const updateRemaining = async () => {
-        const diff = createdMillis + ORDER_EXPIRY_MS - Date.now();
-        const remaining = diff > 0 ? diff : 0;
-        setRemainingMs(remaining);
-
-        if (remaining === 0 && !hasExpiredRef.current) {
-          hasExpiredRef.current = true;
-          const user = auth.currentUser;
-          if (!user || !orderId) return;
-          try {
-            await updateDoc(doc(db, "users", user.uid, "orders", orderId), {
-              status: "failed",
-              expiredAt: serverTimestamp(),
-            });
-          } catch (error) {
-            console.log("Expire order update error:", error);
-          }
-          if (timer) {
-            clearInterval(timer);
-          }
-        }
-      };
-      updateRemaining();
-      timer = setInterval(updateRemaining, 1000);
-    } else {
-      hasExpiredRef.current = false;
-      setRemainingMs(0);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [order?.createdAt, status, orderId]);
-
-  const formattedCountdown = () => {
-    const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-    const minutes = Math.floor(totalSeconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-    return `${minutes}:${seconds}`;
-  };
 
   const handleBack = () => {
     navigation.navigate("MainDrawer", { screen: "List" });
@@ -288,7 +207,19 @@ export default function PaymentScreen({ navigation, route }) {
           ))}
         </View>
 
-        {isPaid || isFailed ? (
+        {isPending ? (
+          <View style={styles.instructions}>
+            <Text style={styles.instructionsTitle}>How to pay</Text>
+            <Text style={styles.instructionsText}>
+              1. Open your banking app that supports PromptPay QR codes.
+              {"\n"}
+              2. Scan the QR code above and verify the amount before
+              confirming.{"\n"}
+              3. Once the payment is completed, the status will update
+              automatically after Stripe confirms it.
+            </Text>
+          </View>
+        ) : (
           <View style={styles.instructions}>
             <Text style={styles.instructionsTitle}>Order status</Text>
             <Text style={styles.instructionsText}>
@@ -297,20 +228,13 @@ export default function PaymentScreen({ navigation, route }) {
                 : "Payment has not been confirmed. If you have already been charged, please contact support."}
             </Text>
           </View>
-        ) : null}
+        )}
 
         {isPending && (
           <View style={styles.waitingNotice}>
-            <Ionicons
-              name="time-outline"
-              size={18}
-              color="#F5A623"
-              style={{ marginRight: 6 }}
-            />
+            <ActivityIndicator size="small" color="#F5A623" />
             <Text style={styles.waitingText}>
-              {remainingMs > 0
-                ? `Time remaining: ${formattedCountdown()}`
-                : "Payment window expired"}
+              Waiting for payment confirmation...
             </Text>
           </View>
         )}

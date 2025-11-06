@@ -17,6 +17,8 @@ import {
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 
 const STATUS_COLOR = {
@@ -32,6 +34,34 @@ const STATUS_LABEL = {
   paid: "Paid",
   canceled: "Cancelled",
   failed: "Payment failed",
+};
+
+const ORDER_EXPIRY_MS = 30 * 60 * 1000;
+
+const getTimestampMillis = (value) => {
+  if (!value) return null;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.seconds === "number") return value.seconds * 1000;
+  if (typeof value === "number") return value;
+  return null;
+};
+
+const maybeExpireOrderDoc = async (docSnap, data, now = Date.now()) => {
+  const createdMillis = getTimestampMillis(data?.createdAt);
+  if (
+    data?.status === "pending" &&
+    createdMillis &&
+    now - createdMillis >= ORDER_EXPIRY_MS
+  ) {
+    try {
+      await updateDoc(docSnap.ref, {
+        status: "failed",
+        expiredAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.log("Expire order error:", error);
+    }
+  }
 };
 
 export default function ListScreen({ navigation }) {
@@ -50,6 +80,12 @@ export default function ListScreen({ navigation }) {
     const unsubscribe = onSnapshot(
       ordersQuery,
       (snapshot) => {
+        const now = Date.now();
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          maybeExpireOrderDoc(docSnap, data, now);
+        });
+
         const parsed = snapshot.docs.map((docSnap) => {
           const data = docSnap.data();
           const createdAt =
