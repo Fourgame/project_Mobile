@@ -31,7 +31,9 @@
     "react-native-qrcode-svg": "^6.3.20",
     "react-native-reanimated": "4.1.1",
     "react-native-svg": "15.12.1",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "expo-media-library": "~18.2.0",
+    "expo-linear-gradient": "~15.0.7"
   },
   "overrides": {
     "react-native-worklets": "0.5.1"

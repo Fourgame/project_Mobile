@@ -30,9 +30,9 @@ import {
 import { auth, db } from "../firebase/firebaseConfig";
 
 const CATEGORY_LIST = [
-  { key: "shirt", label: "Shirt" },
-  { key: "glasses", label: "Glasses" },
+  { key: "shirts", label: "Shirts" },
   { key: "pants", label: "Pants" },
+  { key: "shoes", label: "Shoes" },
 ];
 
 const emptyItems = CATEGORY_LIST.reduce(

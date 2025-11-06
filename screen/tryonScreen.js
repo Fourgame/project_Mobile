@@ -254,6 +254,65 @@ export default function TryOnScreen({ navigation, route }) {
     }
   };
 
+  const requestMediaSavePermission = async () => {
+    const current = await MediaLibrary.getPermissionsAsync(true, ["photo"]);
+    if (current.granted) {
+      return true;
+    }
+
+    const requested = await MediaLibrary.requestPermissionsAsync(true, [
+      "photo",
+    ]);
+
+    if (!requested.granted) {
+      Alert.alert(
+        "Permission required",
+        "Please allow access to save images to your gallery."
+      );
+      return false;
+    }
+
+    if (requested.accessPrivileges === "limited") {
+      Alert.alert(
+        "Limited access",
+        "Grant full photo access to save try-on images.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Open settings",
+            onPress: () => {
+              if (typeof Linking.openSettings === "function") {
+                Linking.openSettings();
+              }
+            },
+          },
+        ]
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const getWritableDirectory = () => {
+    const candidates = [
+      FileSystem.cacheDirectory,
+      FileSystem.documentDirectory,
+    ];
+
+    for (const candidate of candidates) {
+      if (
+        typeof candidate === "string" &&
+        candidate.length > 0 &&
+        candidate !== "undefined"
+      ) {
+        return candidate.endsWith("/") ? candidate : `${candidate}/`;
+      }
+    }
+
+    return null;
+  };
+
   const addProductImage = async () => {
     const allowed = await requestMediaPermission();
     if (!allowed) return;
@@ -494,6 +553,12 @@ export default function TryOnScreen({ navigation, route }) {
     if (!item?.url) {
       return;
     }
+
+    const hasPermission = await requestMediaSavePermission();
+    if (!hasPermission) {
+      return;
+    }
+
     try {
       await Linking.openURL(item.url);
     } catch (error) {
@@ -1293,3 +1358,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F1FF",
   },
 });
+

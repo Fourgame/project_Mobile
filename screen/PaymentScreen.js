@@ -8,17 +8,24 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { auth, db } from "../firebase/firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
+import Constants from "expo-constants";
+console.log("appOwnership =", Constants.appOwnership);
 
 export default function PaymentScreen({ navigation, route }) {
+  console.log("appOwnership =", Constants.appOwnership);
   const orderId = route.params?.orderId;
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [savingQr, setSavingQr] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -73,6 +80,93 @@ export default function PaymentScreen({ navigation, route }) {
   const handleBack = () => {
     navigation.navigate("MainDrawer", { screen: "List" });
   };
+
+  const requestMediaPermission = async () => {
+    const { status, granted } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted" && !granted) {
+      Alert.alert(
+        "Permission required",
+        "Please allow photo library access to save the QR code."
+      );
+      return false;
+    }
+    return true;
+  };
+  // หา writable directory โดยลองทั้ง Directory และ Paths (ทั้งแบบ function/obj)
+  const getWritableDirectory = async () => {
+  try {
+    console.log("FS keys =", Object.keys(FileSystem));
+    console.log("Has Directory?", !!FileSystem.Directory);
+    console.log("Has Directory.documentDirectory?", !!FileSystem.Directory?.documentDirectory);
+    console.log("Has Directory.cacheDirectory?", !!FileSystem.Directory?.cacheDirectory);
+
+    if (FileSystem.Directory?.documentDirectory) {
+      const d = await FileSystem.Directory.documentDirectory();
+      console.log("Directory.documentDirectory() ->", d);
+      if (d) return d;
+    }
+    if (FileSystem.Directory?.cacheDirectory) {
+      const c = await FileSystem.Directory.cacheDirectory();
+      console.log("Directory.cacheDirectory() ->", c);
+      if (c) return c;
+    }
+  } catch (e) {
+    console.log("Directory API error:", e);
+  }
+
+  try {
+    console.log("typeof Paths =", typeof FileSystem.Paths);
+    const p = typeof FileSystem.Paths === "function"
+      ? await FileSystem.Paths()
+      : FileSystem.Paths;
+    console.log("Paths value ->", p);
+
+    if (p?.documentDirectory) return p.documentDirectory;
+    if (p?.cacheDirectory) return p.cacheDirectory;
+  } catch (e) {
+    console.log("Paths API error:", e);
+  }
+
+  return null;
+};
+
+const ensureSlash = (p) => (p?.endsWith("/") ? p : p + "/");
+
+  const handleSaveQr = async () => {
+  if (!qrImageUri) return;
+
+  const { status, granted } = await MediaLibrary.requestPermissionsAsync();
+  if (status !== "granted" && !granted) {
+    Alert.alert("Permission required", "Please allow photo library access to save the QR code.");
+    return;
+  }
+
+  setSavingQr(true);
+  try {
+    const dir = await getWritableDirectory();
+    if (!dir) throw new Error("No writable directory available on this device.");
+    const directory = ensureSlash(dir);                       // ✅ normalize
+    const fileUri = `${directory}payment-qr-${Date.now()}.png`;
+
+    if (qrImageUri.startsWith("data:")) {
+      const base64 = qrImageUri.replace(/^data:image\/\w+;base64,/, "");
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+    } else {
+      const dl = await FileSystem.downloadAsync(qrImageUri, fileUri);
+      if (!dl || dl.status !== 200) throw new Error("Unable to download the QR image.");
+    }
+
+    await MediaLibrary.saveToLibraryAsync(fileUri);
+    Alert.alert("Saved", "QR code saved to your photo library.");
+  } catch (e) {
+    console.log("SAVE ERROR:", e);
+    Alert.alert("Save failed", e?.message || "Unable to save the QR code right now.");
+  } finally {
+    setSavingQr(false);
+  }
+};
 
   if (loading) {
     return (
@@ -141,11 +235,37 @@ export default function PaymentScreen({ navigation, route }) {
             <>
               <View style={styles.qrWrapper}>
                 {qrImageUri ? (
-                  <Image
-                    source={{ uri: qrImageUri }}
-                    style={styles.qrImage}
-                    resizeMode="contain"
-                  />
+                  <>
+                    <Image
+                      source={{ uri: qrImageUri }}
+                      style={styles.qrImage}
+                      resizeMode="contain"
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.saveButton,
+                        savingQr && styles.saveButtonDisabled,
+                      ]}
+                      onPress={handleSaveQr}
+                      disabled={savingQr}
+                      activeOpacity={0.85}
+                    >
+                      {savingQr ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="download-outline"
+                            size={18}
+                            color="#fff"
+                          />
+                          <Text style={styles.saveButtonText}>
+                            Save QR code
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </>
                 ) : (
                   <View style={styles.qrPlaceholder}>
                     <ActivityIndicator size="large" color="#0C7FDA" />
@@ -384,6 +504,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 12,
     borderRadius: 20,
+    alignItems: "center",
+    gap: 12,
   },
   qrImage: {
     width: 220,
@@ -399,6 +521,24 @@ const styles = StyleSheet.create({
   qrPlaceholderText: {
     color: "#0C7FDA",
     fontSize: 14,
+  },
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#0C7FDA",
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
   },
   promptpayText: {
     color: "#B2C4E4",
