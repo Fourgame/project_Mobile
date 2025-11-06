@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,10 +12,19 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from "buffer";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
+import { auth, db } from "../firebase/firebaseConfig";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "firebase/firestore";
 
 global.Buffer = global.Buffer || Buffer;
 
@@ -23,8 +32,6 @@ const CLOUD_FN_URL =
   "https://tryon-us-715686729537.us-central1.run.app";
 const CLOUDINARY_CLOUD_NAME = "di854zkud";
 const CLOUDINARY_UNSIGNED_PRESET = "mobile_unsigned";
-const HISTORY_STORAGE_KEY = "tryon-history";
-
 const uploadResultToCloudinary = async (dataUri) => {
   const body = new FormData();
   body.append("file", dataUri);
@@ -48,32 +55,43 @@ const uploadResultToCloudinary = async (dataUri) => {
   };
 };
 
-const loadHistoryFromStorage = async () => {
-  try {
-    const stored = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (error) {
-    console.log("Failed to load history", error);
+const parseHistoryDoc = (docSnap) => {
+  const data = docSnap.data() || {};
+  let createdAt = data.createdAt || null;
+  if (createdAt && typeof createdAt.toDate === "function") {
+    createdAt = createdAt.toDate();
+  } else if (createdAt && !(createdAt instanceof Date)) {
+    const fallback = new Date(createdAt);
+    createdAt = Number.isNaN(fallback.getTime()) ? null : fallback;
   }
-  return [];
+
+  return {
+    id: docSnap.id,
+    url: data.url || null,
+    publicId: data.publicId || null,
+    products: Array.isArray(data.products) ? data.products : [],
+    totalPrice: Number.isFinite(Number(data.totalPrice))
+      ? Number(data.totalPrice)
+      : null,
+    createdAt,
+  };
 };
 
-const persistHistory = async (history) => {
-  try {
-    await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
-  } catch (error) {
-    console.log("Failed to persist history", error);
-  }
+const fetchHistoryFromFirestore = async (uid) => {
+  const historyRef = collection(db, "users", uid, "tryonHistory");
+  const historyQuery = query(historyRef, orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(historyQuery);
+  return snapshot.docs.map(parseHistoryDoc);
 };
 
 const formatDateTime = (value) => {
   if (!value) return "";
-  const date = new Date(value);
+  let date = value;
+  if (date && typeof date.toDate === "function") {
+    date = date.toDate();
+  } else if (!(date instanceof Date)) {
+    date = new Date(date);
+  }
   if (Number.isNaN(date.getTime())) {
     return "";
   }
@@ -195,19 +213,51 @@ export default function TryOnScreen({ navigation, route }) {
   const [uploadingResult, setUploadingResult] = useState(false);
   const [resultCloudinaryUrl, setResultCloudinaryUrl] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      const storedHistory = await loadHistoryFromStorage();
-      if (isMounted) {
-        setHistory(storedHistory);
-        setHistoryLoading(false);
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const getCurrentUserOrRedirect = useCallback(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      navigation.replace("Login");
+      return null;
+    }
+    return user;
+  }, [navigation]);
+
+  const refreshHistory = useCallback(async () => {
+    const user = getCurrentUserOrRedirect();
+    if (!user) {
+      return null;
+    }
+    return fetchHistoryFromFirestore(user.uid);
+  }, [getCurrentUserOrRedirect]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      setHistoryLoading(true);
+      refreshHistory()
+        .then((entries) => {
+          if (!isActive) return;
+          if (entries) {
+            setHistory(entries);
+          } else {
+            setHistory([]);
+          }
+        })
+        .catch((error) => {
+          if (isActive) {
+            console.log("Try-on history fetch error:", error);
+          }
+        })
+        .finally(() => {
+          if (isActive) {
+            setHistoryLoading(false);
+          }
+        });
+      return () => {
+        isActive = false;
+      };
+    }, [refreshHistory])
+  );
 
   useEffect(() => {
     if (historyOnly || route?.params?.initialTab === "history") {
@@ -365,6 +415,17 @@ export default function TryOnScreen({ navigation, route }) {
       return;
     }
 
+    const user = getCurrentUserOrRedirect();
+    if (!user) {
+      return;
+    }
+    const historyCollectionRef = collection(
+      db,
+      "users",
+      user.uid,
+      "tryonHistory"
+    );
+
     setLoading(true);
     setResultImage(null);
     setResultCloudinaryUrl(null);
@@ -419,18 +480,36 @@ export default function TryOnScreen({ navigation, route }) {
       try {
         const uploaded = await uploadResultToCloudinary(resultDataUri);
         setResultCloudinaryUrl(uploaded.url);
-        const entry = {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          url: uploaded.url,
-          createdAt: new Date().toISOString(),
-          products: historyProducts,
-          totalPrice: historyTotalPrice,
-        };
-        setHistory((prev) => {
-          const updated = [entry, ...prev];
-          persistHistory(updated);
-          return updated;
-        });
+        try {
+          const docRef = await addDoc(historyCollectionRef, {
+            url: uploaded.url,
+            publicId: uploaded.publicId || null,
+            products: historyProducts,
+            totalPrice: historyTotalPrice,
+            createdAt: serverTimestamp(),
+          });
+          const newEntry = {
+            id: docRef.id,
+            url: uploaded.url,
+            publicId: uploaded.publicId || null,
+            products: historyProducts,
+            totalPrice: historyTotalPrice,
+            createdAt: new Date(),
+          };
+          setHistory((prev) => [newEntry, ...prev]);
+          try {
+            const latest = await fetchHistoryFromFirestore(user.uid);
+            setHistory(latest);
+          } catch (refreshError) {
+            console.log("Try-on history refresh error:", refreshError);
+          }
+        } catch (historyError) {
+          console.log("Try-on history save error:", historyError);
+          Alert.alert(
+            "History save failed",
+            "Result uploaded but could not save to history. Please try again later."
+          );
+        }
       } catch (uploadError) {
         console.log("Cloudinary upload failed", uploadError);
         Alert.alert(

@@ -152,15 +152,15 @@ export default function CartScreen({ navigation }) {
     if (selectedItems.length === 0) {
       Alert.alert(
         "No items selected",
-        "Select up to two items from different categories to try on."
+        "Select up to three items from different categories to try on."
       );
       return;
     }
 
-    if (selectedItems.length > 2) {
+    if (selectedItems.length > 3) {
       Alert.alert(
         "Too many items",
-        "Try-on supports at most two items at the same time."
+        "Try-on supports at most three items at the same time."
       );
       return;
     }
