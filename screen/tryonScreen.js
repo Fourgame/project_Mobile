@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   ScrollView,
   Share,
   StyleSheet,
@@ -12,6 +13,8 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
+import { writeAsStringAsync as writeAsStringAsyncLegacy } from "expo-file-system/legacy";
+import * as MediaLibrary from "expo-media-library";
 import { Buffer } from "buffer";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +23,8 @@ global.Buffer = global.Buffer || Buffer;
 
 const CLOUD_FN_URL =
   "https://tryon-us-715686729537.us-central1.run.app";
+const IMAGE_MEDIA_TYPE = "images";
+const TRYON_ALBUM = "Virtual Try-On";
 
 const formatPrice = (value) => {
   if (value === null || value === undefined) return null;
@@ -165,7 +170,7 @@ export default function TryOnScreen({ navigation, route }) {
     const allowed = await requestMediaPermission();
     if (!allowed) return;
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: IMAGE_MEDIA_TYPE,
       quality: 1,
     });
     if (!res.canceled) {
@@ -174,11 +179,70 @@ export default function TryOnScreen({ navigation, route }) {
     }
   };
 
+  const requestMediaSavePermission = async () => {
+    const current = await MediaLibrary.getPermissionsAsync(true, ["photo"]);
+    if (current.granted) {
+      return true;
+    }
+
+    const requested = await MediaLibrary.requestPermissionsAsync(true, [
+      "photo",
+    ]);
+
+    if (!requested.granted) {
+      Alert.alert(
+        "Permission required",
+        "Please allow access to save images to your gallery."
+      );
+      return false;
+    }
+
+    if (requested.accessPrivileges === "limited") {
+      Alert.alert(
+        "Limited access",
+        "Grant full photo access to save try-on images.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Open settings",
+            onPress: () => {
+              if (typeof Linking.openSettings === "function") {
+                Linking.openSettings();
+              }
+            },
+          },
+        ]
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const getWritableDirectory = () => {
+    const candidates = [
+      FileSystem.cacheDirectory,
+      FileSystem.documentDirectory,
+    ];
+
+    for (const candidate of candidates) {
+      if (
+        typeof candidate === "string" &&
+        candidate.length > 0 &&
+        candidate !== "undefined"
+      ) {
+        return candidate.endsWith("/") ? candidate : `${candidate}/`;
+      }
+    }
+
+    return null;
+  };
+
   const addProductImage = async () => {
     const allowed = await requestMediaPermission();
     if (!allowed) return;
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: IMAGE_MEDIA_TYPE,
       quality: 1,
     });
     if (!res.canceled) {
@@ -201,7 +265,7 @@ export default function TryOnScreen({ navigation, route }) {
     const allowed = await requestMediaPermission();
     if (!allowed) return;
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: IMAGE_MEDIA_TYPE,
       quality: 1,
     });
     if (!res.canceled) {
@@ -315,19 +379,57 @@ export default function TryOnScreen({ navigation, route }) {
 
   const handleDownloadResult = async () => {
     if (!resultImage) {
-      Alert.alert("No result yet", "Generate a try-on image before downloading.");
+      Alert.alert(
+        "No result yet",
+        "Generate a try-on image before downloading."
+      );
       return;
     }
+
+    const hasPermission = await requestMediaSavePermission();
+    if (!hasPermission) {
+      return;
+    }
+
     try {
+      const directory = getWritableDirectory();
+      if (!directory) {
+        throw new Error("No writable directory available on this device.");
+      }
+
       const filename = `tryon-${Date.now()}.png`;
-      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      const fileUri = `${directory}${filename}`;
       const base64 = resultImage.replace(/^data:image\/\w+;base64,/, "");
-      await FileSystem.writeAsStringAsync(fileUri, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      Alert.alert("Image saved", `Saved to ${fileUri}`);
+
+      await writeAsStringAsyncLegacy(fileUri, base64, { encoding: "base64" });
+
+      let asset;
+      try {
+        asset = await MediaLibrary.createAssetAsync(fileUri);
+      } catch (assetError) {
+        console.warn("createAssetAsync failed, falling back", assetError);
+        await MediaLibrary.saveToLibraryAsync(fileUri);
+        Alert.alert("Image saved", "Saved to your photo library.");
+        return;
+      }
+
+      try {
+        const album = await MediaLibrary.getAlbumAsync(TRYON_ALBUM);
+        if (album) {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        } else {
+          await MediaLibrary.createAlbumAsync(TRYON_ALBUM, asset, false);
+        }
+      } catch (albumError) {
+        console.warn("Album handling failed", albumError);
+      }
+
+      Alert.alert("Image saved", "Saved to your photo library.");
     } catch (error) {
-      Alert.alert("Download failed", error.message || "Unable to save the image.");
+      Alert.alert(
+        "Download failed",
+        error.message || "Unable to save the image."
+      );
     }
   };
 
@@ -864,3 +966,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+

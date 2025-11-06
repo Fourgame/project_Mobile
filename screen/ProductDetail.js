@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,10 @@ import {
   Modal,
   Pressable,
   TextInput,
+  Animated,
+  Easing,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useCart } from "../context/CartContext";
@@ -24,6 +27,72 @@ export default function ProductDetail({ navigation, route }) {
   const [buySheetVisible, setBuySheetVisible] = useState(false);
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
   const [isProfileComplete, setIsProfileComplete] = useState(null);
+  const [showAddedToast, setShowAddedToast] = useState(false);
+  const toastTimerRef = useRef(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastScale = useRef(new Animated.Value(0.95)).current;
+
+  const triggerAddedToast = useCallback(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+
+    toastOpacity.stopAnimation();
+    toastScale.stopAnimation();
+
+    setShowAddedToast(true);
+
+    Animated.parallel([
+      Animated.timing(toastOpacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(toastScale, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      toastTimerRef.current = setTimeout(() => {
+        toastTimerRef.current = null;
+        Animated.parallel([
+          Animated.timing(toastOpacity, {
+            toValue: 0,
+            duration: 220,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(toastScale, {
+            toValue: 0.95,
+            duration: 220,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]).start(({ finished }) => {
+          if (finished) {
+            setShowAddedToast(false);
+          }
+        });
+      }, 1000);
+    });
+  }, [toastOpacity, toastScale]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+      toastOpacity.stopAnimation();
+      toastScale.stopAnimation();
+      toastOpacity.setValue(0);
+      toastScale.setValue(0.95);
+    };
+  }, [toastOpacity, toastScale]);
 
   const imageUri = item?.picture || "";
   const price = item?.price;
@@ -108,9 +177,16 @@ export default function ProductDetail({ navigation, route }) {
 
   const handleAddToCart = () => {
     if (!item) return;
-    addToCart(item);
-    Alert.alert("Added to cart", "You can review it in your cart.");
-    navigation.navigate("MainDrawer", { screen: "Cart" });
+    const result = addToCart(item);
+    if (result?.status === "max") {
+      Alert.alert(
+        "Quantity limit reached",
+        "This item already has the maximum quantity available in your cart."
+      );
+      return;
+    }
+
+    triggerAddedToast();
   };
   const handleTryOn = () => {
     const productItem = item
@@ -251,19 +327,47 @@ export default function ProductDetail({ navigation, route }) {
         <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart}>
           <Ionicons name="cart-outline" size={22} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tryButton} onPress={handleTryOn}>
-          <Ionicons
-            name="color-wand-outline"
-            size={18}
-            color="#fff"
-            style={styles.tryIcon}
-          />
-          <Text style={styles.tryButtonText}>Try-On</Text>
+        <TouchableOpacity
+          style={styles.tryButton}
+          onPress={handleTryOn}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={["#4796E3", "#9177C7", "#CA6673"]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.tryGradient}
+          >
+            <Ionicons
+              name="sparkles-outline"
+              size={18}
+              color="#fff"
+              style={styles.tryIcon}
+            />
+            <Text style={styles.tryButtonText}>Try-On</Text>
+          </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity style={styles.buyButton} onPress={openBuySheet}>
           <Text style={styles.buyButtonText}>Buy now</Text>
         </TouchableOpacity>
       </View>
+
+      {showAddedToast && (
+        <View pointerEvents="none" style={styles.toastOverlay}>
+          <Animated.View
+            style={[
+              styles.toastContainer,
+              {
+                opacity: toastOpacity,
+                transform: [{ scale: toastScale }],
+              },
+            ]}
+          >
+            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+            <Text style={styles.toastText}>Added to cart</Text>
+          </Animated.View>
+        </View>
+      )}
 
       <Modal
         visible={buySheetVisible}
@@ -456,11 +560,14 @@ const styles = StyleSheet.create({
   },
   tryButton: {
     flex: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  tryGradient: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#0C7FDA",
-    borderRadius: 10,
     height: 44,
     paddingHorizontal: 18,
   },
@@ -585,6 +692,29 @@ const styles = StyleSheet.create({
   modalBuyButtonText: {
     color: "#fff",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  toastOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  toastContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 15,
     fontWeight: "600",
   },
 });

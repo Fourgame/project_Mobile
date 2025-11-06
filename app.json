@@ -7,21 +7,39 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": true
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.project_cyber",
+
+      "permissions": [
+        "READ_MEDIA_IMAGES"
+      ]
     },
+
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow this app to save images to your photo library."
+        }
+      ]
+    ],
+
     "web": {
       "favicon": "./assets/favicon.png"
     }

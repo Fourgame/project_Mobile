@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
 import { useCart } from "../context/CartContext";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function CartScreen({ navigation }) {
   const { cartItems, removeFromCart, updateCartQuantity } = useCart();
@@ -34,6 +35,23 @@ export default function CartScreen({ navigation }) {
       [cartId]: !prev[cartId],
     }));
   };
+
+  const allSelected = useMemo(
+    () =>
+      cartItems.length > 0 &&
+      cartItems.every((item) => selected[item.cartId]),
+    [cartItems, selected]
+  );
+
+  const toggleSelectAll = useCallback(() => {
+    if (cartItems.length === 0) return;
+    const nextValue = !allSelected;
+    const updated = {};
+    cartItems.forEach((item) => {
+      updated[item.cartId] = nextValue;
+    });
+    setSelected(updated);
+  }, [allSelected, cartItems]);
 
   const handleDelete = (cartId) => {
     removeFromCart(cartId);
@@ -127,13 +145,41 @@ export default function CartScreen({ navigation }) {
   const paymentDisabled = selectedItems.length === 0;
   const handleTryOnFromCart = () => {
     if (cartItems.length === 0) {
-      Alert.alert("ยังไม่มีสินค้า", "เพิ่มสินค้าในตะกร้าก่อนลองเสื้อ");
+      Alert.alert("Cart is empty", "Add items to your cart before using try-on.");
       return;
     }
 
-    const productItems = cartItems
+    if (selectedItems.length === 0) {
+      Alert.alert(
+        "No items selected",
+        "Select up to two items from different categories to try on."
+      );
+      return;
+    }
+
+    if (selectedItems.length > 2) {
+      Alert.alert(
+        "Too many items",
+        "Try-on supports at most two items at the same time."
+      );
+      return;
+    }
+
+    const categorySet = new Set();
+    for (const selectedItem of selectedItems) {
+      const categoryKey = (selectedItem.category || "unknown").toLowerCase();
+      if (categorySet.has(categoryKey)) {
+        Alert.alert(
+          "Duplicate categories",
+          "Choose items from different categories for try-on."
+        );
+        return;
+      }
+      categorySet.add(categoryKey);
+    }
+
+    const productItems = selectedItems
       .map((item, index) => {
-        if (!item) return null;
         const uri =
           item.picture ||
           item.image ||
@@ -209,6 +255,32 @@ export default function CartScreen({ navigation }) {
           </View>
         ) : (
           <View style={styles.listCard}>
+            <TouchableOpacity
+              style={[
+                styles.selectAllButton,
+                allSelected && styles.selectAllButtonActive,
+              ]}
+              onPress={toggleSelectAll}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={
+                  allSelected
+                    ? "checkmark-circle"
+                    : "checkmark-circle-outline"
+                }
+                size={18}
+                color={allSelected ? "#fff" : "#0C7FDA"}
+              />
+              <Text
+                style={[
+                  styles.selectAllText,
+                  allSelected && styles.selectAllTextActive,
+                ]}
+              >
+                {allSelected ? "Unselect all" : "Select all"}
+              </Text>
+            </TouchableOpacity>
             {cartItems.map((item) => {
               const stock = getStockForItem(item);
               const remainingText =
@@ -317,8 +389,15 @@ export default function CartScreen({ navigation }) {
           activeOpacity={0.9}
           onPress={handleTryOnFromCart}
         >
-          <Ionicons name="sparkles-outline" size={18} color="#fff" />
-          <Text style={styles.tryButtonText}>Try-On</Text>
+          <LinearGradient
+            colors={["#4796E3", "#9177C7", "#CA6673"]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.tryGradient}
+          >
+            <Ionicons name="sparkles-outline" size={18} color="#fff" />
+            <Text style={styles.tryButtonText}>Try-On</Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         <View style={styles.footerDivider} />
@@ -367,6 +446,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e5ea",
     gap: 12,
+  },
+  selectAllButton: {
+    alignSelf: "flex-end",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#0C7FDA",
+    backgroundColor: "#f4f9ff",
+  },
+  selectAllButtonActive: {
+    backgroundColor: "#0C7FDA",
+  },
+  selectAllText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0C7FDA",
+  },
+  selectAllTextActive: {
+    color: "#fff",
   },
   itemRow: {
     flexDirection: "row",
@@ -473,11 +575,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f7fa",
   },
   tryButton: {
+    flex: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  tryGradient: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
-    backgroundColor: "#0C7FDA",
-    borderRadius: 10,
     paddingHorizontal: 16,
     height: 44,
   },

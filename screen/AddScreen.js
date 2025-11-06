@@ -17,16 +17,16 @@ import { addDoc, collection, doc, onSnapshot, serverTimestamp } from "firebase/f
 import { auth, db } from "../firebase/firebaseConfig";
 
 const CATEGORY_OPTIONS = [
-  { key: "shirt", label: "Shirt" },
-  { key: "glasses", label: "Glasses" },
+  { key: "shirts", label: "Shirts" },
   { key: "pants", label: "Pants" },
+  { key: "shoes", label: "Shoes" },
 ];
 
 const CLOUDINARY_CLOUD_NAME = "di854zkud";
 const CLOUDINARY_UNSIGNED_PRESET = "mobile_unsigned";
 
 export default function AddScreen({ navigation }) {
-  const [selectedCategory, setSelectedCategory] = useState("shirt");
+  const [selectedCategory, setSelectedCategory] = useState("shirts");
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");

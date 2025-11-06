@@ -171,6 +171,7 @@ export default function ProfileScreen({ navigation }) {
             email: data.email ?? user.email ?? "",
             photoUrl: data.photoUrl ?? "",
             photoPublicId: data.photoPublicId ?? "",
+            phone: data.phone ? String(data.phone) : "",
           });
 
           if (data.address) {
