@@ -835,6 +835,7 @@ export default function TryOnScreen({ navigation, route }) {
                       <Image
                         source={{ uri: entry.url }}
                         style={styles.historyImage}
+                        resizeMode="contain"
                       />
                       <View style={styles.historyInfo}>
                         <Text style={styles.historyTimestamp}>
