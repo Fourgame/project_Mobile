@@ -18,6 +18,7 @@ import {
 import HomeScreen from "../screen/HomeScreen";
 import CartScreen from "../screen/Cart";
 import ListScreen from "../screen/ListScreen";
+import TryOnScreen from "../screen/tryonScreen";
 import ProfileScreen from "../screen/ProfileScreen";
 import { auth } from "../firebase/firebaseConfig";
 
@@ -137,6 +138,22 @@ export default function MainDrawer() {
             drawerIcon: ({ color, size, focused }) => (
               <Ionicons
                 name="list"
+                size={focused ? size + 2 : size}
+                color={color}
+              />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="History"
+          component={TryOnScreen}
+          initialParams={{ initialTab: "history", historyOnly: true }}
+          options={{
+            title: "History",
+            drawerIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name="time-outline"
                 size={focused ? size + 2 : size}
                 color={color}
               />

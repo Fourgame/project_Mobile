@@ -272,7 +272,7 @@ export default function AddScreen({ navigation }) {
           <Text style={styles.label}>Picture</Text>
           <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
             {imageAsset?.uri ? (
-              <Image source={{ uri: imageAsset.uri }} style={styles.previewImage} />
+              <Image source={{ uri: imageAsset.uri }} style={styles.previewImage} resizeMode="contain"/>
             ) : (
               <View style={styles.placeholder}>
                 <Ionicons name="image-outline" size={32} color="#0C7FDA" />
